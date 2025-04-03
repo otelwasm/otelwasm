@@ -3,6 +3,7 @@ module github.com/musaprg/otelwasm/wasmprocessor
 go 1.24.0
 
 require (
+	github.com/tetratelabs/wazero v1.9.0
 	go.opentelemetry.io/collector/component v1.29.0
 	go.opentelemetry.io/collector/component/componenttest v0.123.0
 	go.opentelemetry.io/collector/consumer v1.29.0
