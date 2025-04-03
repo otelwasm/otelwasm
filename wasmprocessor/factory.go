@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	typeStr                                = component.MustNewType("wasmprocessor")
+	typeStr                                = component.MustNewType("wasm")
 	processorCapabilities                  = consumer.Capabilities{MutatesData: true}
 	_                     component.Config = (*Config)(nil)
 )
