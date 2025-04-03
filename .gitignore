@@ -19,3 +19,6 @@ go.work.sum
 
 # env file
 .env
+
+otelcol-dev/
+ocb
