@@ -23,13 +23,14 @@ package v1
 import (
 	binary "encoding/binary"
 	fmt "fmt"
+	io "io"
+	math "math"
+	bits "math/bits"
+
 	v11 "go.opentelemetry.io/proto/otlp/common/v1"
 	v1 "go.opentelemetry.io/proto/otlp/resource/v1"
 	proto "google.golang.org/protobuf/proto"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
-	io "io"
-	math "math"
-	bits "math/bits"
 )
 
 const (
