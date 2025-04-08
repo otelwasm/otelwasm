@@ -55,3 +55,6 @@ update-pdata-proto: proto-tools
 format:
 	@go run $(gofumpt) -l -w .
 	@go run $(gosimports) -local sigs.k8s.io/kube-scheduler-wasm-extension/ -w $(shell find . -name '*.go' -type f)
+
+examples/nop/main.wasm: examples/nop/main.go
+	@(cd $(@D); GOOS=wasip1 GOARCH=wasm go build -buildmode=c-shared -o main.wasm ./...)
