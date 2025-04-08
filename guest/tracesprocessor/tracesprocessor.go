@@ -12,13 +12,15 @@ var tracesprocessor api.TracesProcessor
 
 func SetPlugin(tp api.TracesProcessor) {
 	if tp == nil {
-		return
+		panic("nil TracesProcessor")
 	}
 	tracesprocessor = tp
 	plugin.MustSet(tp)
 }
 
-// go:wasmexport processTraces
+var _ func() uint32 = _processTraces
+
+//go:wasmexport processTraces
 func _processTraces() uint32 {
 	traces := imports.CurrentTraces()
 	result, status := tracesprocessor.ProcessTraces(traces)

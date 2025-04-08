@@ -53,6 +53,6 @@ func SetResultTraces(traces ptrace.Traces) {
 		panic(err)
 	}
 	ptr, size := mem.BytesToPtr(rawMsg)
-	setResultTracesFn(ptr, size)
+	setResultTraces(ptr, size)
 	runtime.KeepAlive(rawMsg) // until ptr is no longer needed
 }

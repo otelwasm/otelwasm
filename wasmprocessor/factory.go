@@ -35,7 +35,10 @@ func createTraces(
 	cfg component.Config,
 	nextConsumer consumer.Traces,
 ) (processor.Traces, error) {
-	wasmProcessor := &wasmProcessor{}
+	wasmProcessor, err := newWasmProcessor(ctx, cfg.(*Config))
+	if err != nil {
+		return nil, err
+	}
 	return processorhelper.NewTraces(ctx, set, cfg, nextConsumer,
 		wasmProcessor.processTraces,
 		processorhelper.WithCapabilities(processorCapabilities),

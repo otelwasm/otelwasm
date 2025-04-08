@@ -31,7 +31,8 @@ func TestCreateDefaultConfig(t *testing.T) {
 func TestCreateTracesProcessor(t *testing.T) {
 	// Test that the processor can be created with the default config
 	factory := NewFactory()
-	cfg := factory.CreateDefaultConfig()
+	cfg := factory.CreateDefaultConfig().(*Config)
+	cfg.Path = "testdata/nop/main.wasm"
 
 	// Test for traces
 	settings := processortest.NewNopSettings(typeStr)
@@ -53,9 +54,12 @@ func TestCreateTracesProcessor(t *testing.T) {
 }
 
 func TestProcessTraces(t *testing.T) {
-	// Test that the processor processes traces without errors
-	// and doesn't modify them (current implementation just returns the traces)
-	wasmProc := &wasmProcessor{}
+	cfg := createDefaultConfig().(*Config)
+	cfg.Path = "testdata/nop/main.wasm"
+	wasmProc, err := newWasmProcessor(context.Background(), cfg)
+	if err != nil {
+		t.Fatalf("failed to create wasm processor: %v", err)
+	}
 
 	// Create test traces with 1 resource, 1 scope, and 1 span
 	traces := ptrace.NewTraces()
@@ -69,8 +73,7 @@ func TestProcessTraces(t *testing.T) {
 	span.SetSpanID([8]byte{1, 2, 3, 4, 5, 6, 7, 8})
 
 	// Process the traces
-	_, err := wasmProc.processTraces(context.Background(), traces)
-	if err != nil {
+	if _, err := wasmProc.processTraces(context.Background(), traces); err != nil {
 		t.Fatalf("failed to process traces: %v", err)
 	}
 }
