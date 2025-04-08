@@ -73,8 +73,30 @@ func TestProcessTraces(t *testing.T) {
 	span.SetSpanID([8]byte{1, 2, 3, 4, 5, 6, 7, 8})
 
 	// Process the traces
-	if _, err := wasmProc.processTraces(context.Background(), traces); err != nil {
+	processedTraces, err := wasmProc.processTraces(context.Background(), traces)
+	if err != nil {
 		t.Fatalf("failed to process traces: %v", err)
+	}
+
+	// Verify the processed traces
+	processedRS := processedTraces.ResourceSpans()
+	if processedRS.Len() != 1 {
+		t.Fatalf("expected 1 resource span, got %d", processedRS.Len())
+	}
+
+	processedResource := processedRS.At(0).Resource()
+	if val, ok := processedResource.Attributes().Get("service.name"); !ok || val.Str() != "test-service" {
+		t.Errorf("expected service.name to be 'test-service', got %v", val)
+	}
+
+	processedSS := processedRS.At(0).ScopeSpans()
+	if processedSS.Len() != 1 {
+		t.Fatalf("expected 1 scope span, got %d", processedSS.Len())
+	}
+
+	processedSpan := processedSS.At(0).Spans().At(0)
+	if processedSpan.Name() != "test-span" {
+		t.Errorf("expected span name to be 'test-span', got %s", processedSpan.Name())
 	}
 }
 
