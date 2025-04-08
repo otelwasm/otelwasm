@@ -53,7 +53,7 @@ func TestCreateTracesProcessor(t *testing.T) {
 	}
 }
 
-func TestProcessTraces(t *testing.T) {
+func TestProcessTracesWithNopProcessor(t *testing.T) {
 	cfg := createDefaultConfig().(*Config)
 	cfg.Path = "testdata/nop/main.wasm"
 	wasmProc, err := newWasmProcessor(context.Background(), cfg)
