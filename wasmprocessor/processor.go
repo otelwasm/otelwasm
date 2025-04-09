@@ -15,7 +15,7 @@ import (
 const (
 	guestExportMemory = "memory"
 	otelWasm          = "opentelemetry.io/wasm"
-	currentTelemetry  = "currentTelemetry"
+	currentTraces     = "currentTraces"
 	setResultTraces   = "setResultTraces"
 )
 
@@ -142,7 +142,7 @@ func instantiateHostModule(ctx context.Context, runtime wazero.Runtime) (api.Mod
 	return runtime.NewHostModuleBuilder(otelWasm).
 		NewFunctionBuilder().
 		WithGoModuleFunction(api.GoModuleFunc(currentTracesFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{api.ValueTypeI32}).
-		WithParameterNames("buf", "buf_limit").Export(currentTelemetry).
+		WithParameterNames("buf", "buf_limit").Export(currentTraces).
 		NewFunctionBuilder().
 		WithGoModuleFunction(api.GoModuleFunc(setResultTracesFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{}).
 		WithParameterNames("buf", "buf_len").Export(setResultTraces).

@@ -36,7 +36,7 @@ func StatusToCode(s *api.Status) uint32 {
 
 func CurrentTraces() ptrace.Traces {
 	rawMsg := mem.GetBytes(func(ptr uint32, limit mem.BufLimit) (len uint32) {
-		return currentTelemetry(ptr, limit)
+		return currentTraces(ptr, limit)
 	})
 	unmarshaler := ptrace.ProtoUnmarshaler{}
 	traces, err := unmarshaler.UnmarshalTraces(rawMsg)

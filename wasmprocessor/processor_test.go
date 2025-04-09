@@ -158,6 +158,7 @@ func TestProcessTracesWithAddNewAttributeProcessor(t *testing.T) {
 func TestConfigValidate(t *testing.T) {
 	// Test that the config validation works as expected
 	cfg := &Config{}
+	cfg.Path = "testdata/nop/main.wasm"
 	if err := cfg.Validate(); err != nil {
 		t.Errorf("config validation failed: %v", err)
 	}
