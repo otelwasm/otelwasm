@@ -2,6 +2,7 @@ package wasmprocessor
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -23,12 +24,16 @@ const (
 	setResultTraces   = "setResultTraces"
 	setResultMetrics  = "setResultMetrics"
 	setResultLogs     = "setResultLogs"
+	getConfig         = "getPluginConfig"
 )
 
 type wasmProcessor struct {
 	wasmProcessTraces  api.Function
 	wasmProcessMetrics api.Function
 	wasmProcessLogs    api.Function
+
+	// pluginConfigJSON is the JSON representation of the plugin config.
+	pluginConfigJSON []byte
 
 	runtime wazero.Runtime
 }
@@ -71,11 +76,22 @@ func newWasmProcessor(ctx context.Context, cfg *Config) (*wasmProcessor, error) 
 	processMetrics := mod.ExportedFunction("processMetrics")
 	processLogs := mod.ExportedFunction("processLogs")
 
+	if processTraces == nil || processMetrics == nil || processLogs == nil {
+		return nil, fmt.Errorf("wasm: guest doesn't export processTraces, processMetrics or processLogs")
+	}
+
+	// Convert the plugin config to JSON representation.
+	pluginConfigJSON, err := json.Marshal(cfg.PluginConfig)
+	if err != nil {
+		return nil, fmt.Errorf("wasm: error marshalling plugin config: %w", err)
+	}
+
 	return &wasmProcessor{
 		runtime:            runtime,
 		wasmProcessTraces:  processTraces,
 		wasmProcessMetrics: processMetrics,
 		wasmProcessLogs:    processLogs,
+		pluginConfigJSON:   pluginConfigJSON,
 	}, nil
 }
 
@@ -116,6 +132,9 @@ type stack struct {
 	resultTraces   ptrace.Traces
 	resultMetrics  pmetric.Metrics
 	resultLogs     plog.Logs
+
+	// pluginConfig is the plugin config in JSON representation passed to the guest.
+	pluginConfigJSON []byte
 }
 
 func paramsFromContext(ctx context.Context) *stack {
@@ -144,6 +163,14 @@ func currentLogsFn(ctx context.Context, mod api.Module, stack []uint64) {
 
 	logs := paramsFromContext(ctx).currentLogs
 	stack[0] = uint64(marshalLogsIfUnderLimit(mod.Memory(), logs, buf, bufLimit))
+}
+
+func getConfigFn(ctx context.Context, mod api.Module, stack []uint64) {
+	buf := uint32(stack[0])
+	bufLimit := bufLimit(stack[1])
+
+	pluginConfig := paramsFromContext(ctx).pluginConfigJSON
+	stack[0] = uint64(writeBytesIfUnderLimit(mod.Memory(), pluginConfig, buf, bufLimit))
 }
 
 func setResultTracesFn(ctx context.Context, mod api.Module, stack []uint64) {
@@ -232,6 +259,9 @@ func instantiateHostModule(ctx context.Context, runtime wazero.Runtime) (api.Mod
 		NewFunctionBuilder().
 		WithGoModuleFunction(api.GoModuleFunc(setResultLogsFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{}).
 		WithParameterNames("buf", "buf_len").Export(setResultLogs).
+		NewFunctionBuilder().
+		WithGoModuleFunction(api.GoModuleFunc(getConfigFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{}).
+		WithParameterNames("buf", "buf_limit").Export(getConfig).
 		Instantiate(ctx)
 }
 
@@ -240,7 +270,8 @@ func (wp *wasmProcessor) processTraces(
 	td ptrace.Traces,
 ) (ptrace.Traces, error) {
 	params := &stack{
-		currentTraces: td,
+		currentTraces:    td,
+		pluginConfigJSON: wp.pluginConfigJSON,
 	}
 	ctx = context.WithValue(ctx, stackKey{}, params)
 
@@ -263,7 +294,8 @@ func (wp *wasmProcessor) processMetrics(
 	md pmetric.Metrics,
 ) (pmetric.Metrics, error) {
 	params := &stack{
-		currentMetrics: md,
+		currentMetrics:   md,
+		pluginConfigJSON: wp.pluginConfigJSON,
 	}
 	ctx = context.WithValue(ctx, stackKey{}, params)
 
@@ -285,7 +317,8 @@ func (wp *wasmProcessor) processLogs(
 	ld plog.Logs,
 ) (plog.Logs, error) {
 	params := &stack{
-		currentLogs: ld,
+		currentLogs:      ld,
+		pluginConfigJSON: wp.pluginConfigJSON,
 	}
 	ctx = context.WithValue(ctx, stackKey{}, params)
 

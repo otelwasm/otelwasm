@@ -110,3 +110,30 @@ func marshalLogsIfUnderLimit(mem wazeroapi.Memory, dt plog.Logs, buf uint32, buf
 	// a sized buffer.
 	return vLen
 }
+
+func writeBytesIfUnderLimit(mem wazeroapi.Memory, b []byte, buf uint32, bufLimit bufLimit) int {
+	vLen := len(b)
+	if vLen == 0 {
+		return 0 // nothing to write
+	}
+
+	// Next, see if the value will fit inside the buffer.
+	if vLen > int(bufLimit) {
+		// If it doesn't fit, the caller can decide to retry with a larger
+		// buffer or fail.
+		return vLen
+	}
+
+	// Now, we know the value isn't too large to fit in the buffer. Write it
+	// directly to the Wasm memory.
+	wasmMem, ok := mem.Read(buf, uint32(vLen))
+	if !ok {
+		panic("out of memory") // Bug: caller passed a length outside memory
+	}
+
+	copy(wasmMem, b)
+
+	// Success: return the bytes written, so that the caller can unmarshal from
+	// a sized buffer.
+	return vLen
+}

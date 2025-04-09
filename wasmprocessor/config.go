@@ -4,6 +4,8 @@ import "fmt"
 
 type Config struct {
 	Path string `mapstructure:"path"`
+
+	PluginConfig PluginConfig `mapstructure:"plugin_config"`
 }
 
 func (cfg *Config) Validate() error {
@@ -12,3 +14,5 @@ func (cfg *Config) Validate() error {
 	}
 	return nil
 }
+
+type PluginConfig map[string]any
