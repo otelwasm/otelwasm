@@ -9,6 +9,7 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
+	"go.opentelemetry.io/collector/pdata/plog"
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 )
@@ -18,13 +19,16 @@ const (
 	otelWasm          = "opentelemetry.io/wasm"
 	currentTraces     = "currentTraces"
 	currentMetrics    = "currentMetrics"
+	currentLogs       = "currentLogs"
 	setResultTraces   = "setResultTraces"
 	setResultMetrics  = "setResultMetrics"
+	setResultLogs     = "setResultLogs"
 )
 
 type wasmProcessor struct {
 	wasmProcessTraces  api.Function
 	wasmProcessMetrics api.Function
+	wasmProcessLogs    api.Function
 
 	runtime wazero.Runtime
 }
@@ -65,11 +69,13 @@ func newWasmProcessor(ctx context.Context, cfg *Config) (*wasmProcessor, error) 
 	// TODO: Check the type of processors based on the exported functions becuase some processors might not support all telemetry types.
 	processTraces := mod.ExportedFunction("processTraces")
 	processMetrics := mod.ExportedFunction("processMetrics")
+	processLogs := mod.ExportedFunction("processLogs")
 
 	return &wasmProcessor{
 		runtime:            runtime,
 		wasmProcessTraces:  processTraces,
 		wasmProcessMetrics: processMetrics,
+		wasmProcessLogs:    processLogs,
 	}, nil
 }
 
@@ -106,8 +112,10 @@ type stackKey struct{}
 type stack struct {
 	currentTraces  ptrace.Traces
 	currentMetrics pmetric.Metrics
+	currentLogs    plog.Logs
 	resultTraces   ptrace.Traces
 	resultMetrics  pmetric.Metrics
+	resultLogs     plog.Logs
 }
 
 func paramsFromContext(ctx context.Context) *stack {
@@ -128,6 +136,14 @@ func currentMetricsFn(ctx context.Context, mod api.Module, stack []uint64) {
 
 	metrics := paramsFromContext(ctx).currentMetrics
 	stack[0] = uint64(marshalMetricsIfUnderLimit(mod.Memory(), metrics, buf, bufLimit))
+}
+
+func currentLogsFn(ctx context.Context, mod api.Module, stack []uint64) {
+	buf := uint32(stack[0])
+	bufLimit := bufLimit(stack[1])
+
+	logs := paramsFromContext(ctx).currentLogs
+	stack[0] = uint64(marshalLogsIfUnderLimit(mod.Memory(), logs, buf, bufLimit))
 }
 
 func setResultTracesFn(ctx context.Context, mod api.Module, stack []uint64) {
@@ -174,6 +190,28 @@ func setResultMetricsFn(ctx context.Context, mod api.Module, stack []uint64) {
 	paramsFromContext(ctx).resultMetrics = metrics
 }
 
+func setResultLogsFn(ctx context.Context, mod api.Module, stack []uint64) {
+	// Read buffer pointer and size from the stack
+	buf := uint32(stack[0])
+	size := uint32(stack[1])
+
+	// Read the serialized logs from WASM memory
+	logsBytes, ok := mod.Memory().Read(buf, size)
+	if !ok {
+		panic("out of memory reading result logs") // Bug: caller passed a length outside memory
+	}
+
+	// Unmarshal the logs
+	unmarshaler := plog.ProtoUnmarshaler{}
+	logs, err := unmarshaler.UnmarshalLogs(logsBytes)
+	if err != nil {
+		panic(err) // Bug: in unmarshaller
+	}
+
+	// Store the result logs in context
+	paramsFromContext(ctx).resultLogs = logs
+}
+
 func instantiateHostModule(ctx context.Context, runtime wazero.Runtime) (api.Module, error) {
 	return runtime.NewHostModuleBuilder(otelWasm).
 		NewFunctionBuilder().
@@ -183,11 +221,17 @@ func instantiateHostModule(ctx context.Context, runtime wazero.Runtime) (api.Mod
 		WithGoModuleFunction(api.GoModuleFunc(currentMetricsFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{api.ValueTypeI32}).
 		WithParameterNames("buf", "buf_limit").Export(currentMetrics).
 		NewFunctionBuilder().
+		WithGoModuleFunction(api.GoModuleFunc(currentLogsFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{api.ValueTypeI32}).
+		WithParameterNames("buf", "buf_limit").Export(currentLogs).
+		NewFunctionBuilder().
 		WithGoModuleFunction(api.GoModuleFunc(setResultTracesFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{}).
 		WithParameterNames("buf", "buf_len").Export(setResultTraces).
 		NewFunctionBuilder().
 		WithGoModuleFunction(api.GoModuleFunc(setResultMetricsFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{}).
 		WithParameterNames("buf", "buf_len").Export(setResultMetrics).
+		NewFunctionBuilder().
+		WithGoModuleFunction(api.GoModuleFunc(setResultLogsFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{}).
+		WithParameterNames("buf", "buf_len").Export(setResultLogs).
 		Instantiate(ctx)
 }
 
@@ -234,4 +278,26 @@ func (wp *wasmProcessor) processMetrics(
 	}
 
 	return params.resultMetrics, nil
+}
+
+func (wp *wasmProcessor) processLogs(
+	ctx context.Context,
+	ld plog.Logs,
+) (plog.Logs, error) {
+	params := &stack{
+		currentLogs: ld,
+	}
+	ctx = context.WithValue(ctx, stackKey{}, params)
+
+	res, err := wp.wasmProcessLogs.Call(ctx)
+	if err != nil {
+		return ld, err
+	}
+
+	statusCode := int32(res[0])
+	if statusCode != 0 {
+		return ld, fmt.Errorf("wasm: error processing logs: %d", statusCode)
+	}
+
+	return params.resultLogs, nil
 }
