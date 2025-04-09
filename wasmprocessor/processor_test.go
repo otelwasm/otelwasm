@@ -54,6 +54,55 @@ func TestCreateTracesProcessor(t *testing.T) {
 	}
 }
 
+func TestCreateMetricsProcessor(t *testing.T) {
+	// Test that the processor can be created with the default config
+	factory := NewFactory()
+	cfg := factory.CreateDefaultConfig().(*Config)
+	cfg.Path = "testdata/nop/main.wasm"
+
+	// Test for metrics
+	settings := processortest.NewNopSettings(typeStr)
+	mp, err := factory.CreateMetrics(context.Background(), settings, cfg, consumertest.NewNop())
+	if err != nil {
+		t.Fatalf("failed to create metrics processor: %v", err)
+	}
+	if mp == nil {
+		t.Fatal("metrics processor is nil")
+	}
+
+	if err := mp.Start(context.Background(), componenttest.NewNopHost()); err != nil {
+		t.Errorf("failed to start processor: %v", err)
+	}
+
+	if err := mp.Shutdown(context.Background()); err != nil {
+		t.Errorf("failed to shutdown processor: %v", err)
+	}
+}
+
+func TestCreateLogsProcessor(t *testing.T) {
+	// Test that the processor can be created with the default config
+	factory := NewFactory()
+	cfg := factory.CreateDefaultConfig().(*Config)
+	cfg.Path = "testdata/nop/main.wasm"
+
+	// Test for logs
+	settings := processortest.NewNopSettings(typeStr)
+	lp, err := factory.CreateLogs(context.Background(), settings, cfg, consumertest.NewNop())
+	if err != nil {
+		t.Fatalf("failed to create logs processor: %v", err)
+	}
+	if lp == nil {
+		t.Fatal("logs processor is nil")
+	}
+
+	if err := lp.Start(context.Background(), componenttest.NewNopHost()); err != nil {
+		t.Errorf("failed to start processor: %v", err)
+	}
+
+	if err := lp.Shutdown(context.Background()); err != nil {
+		t.Errorf("failed to shutdown processor: %v", err)
+	}
+}
 func TestProcessTracesWithNopProcessor(t *testing.T) {
 	cfg := createDefaultConfig().(*Config)
 	cfg.Path = "testdata/nop/main.wasm"
