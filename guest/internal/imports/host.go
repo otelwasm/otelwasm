@@ -21,6 +21,7 @@ import (
 
 	"github.com/musaprg/otelwasm/guest/api"
 	"github.com/musaprg/otelwasm/guest/internal/mem"
+	"go.opentelemetry.io/collector/pdata/plog"
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 )
@@ -59,6 +60,18 @@ func CurrentMetrics() pmetric.Metrics {
 	return metrics
 }
 
+func CurrentLogs() plog.Logs {
+	rawMsg := mem.GetBytes(func(ptr uint32, limit mem.BufLimit) (len uint32) {
+		return currentLogs(ptr, limit)
+	})
+	unmarshaler := plog.ProtoUnmarshaler{}
+	logs, err := unmarshaler.UnmarshalLogs(rawMsg)
+	if err != nil {
+		panic(err)
+	}
+	return logs
+}
+
 func SetResultTraces(traces ptrace.Traces) {
 	marshaler := ptrace.ProtoMarshaler{}
 	rawMsg, err := marshaler.MarshalTraces(traces)
@@ -78,5 +91,16 @@ func SetResultMetrics(metrics pmetric.Metrics) {
 	}
 	ptr, size := mem.BytesToPtr(rawMsg)
 	setResultMetrics(ptr, size)
+	runtime.KeepAlive(rawMsg) // until ptr is no longer needed
+}
+
+func SetResultLogs(logs plog.Logs) {
+	marshaler := plog.ProtoMarshaler{}
+	rawMsg, err := marshaler.MarshalLogs(logs)
+	if err != nil {
+		panic(err)
+	}
+	ptr, size := mem.BytesToPtr(rawMsg)
+	setResultLogs(ptr, size)
 	runtime.KeepAlive(rawMsg) // until ptr is no longer needed
 }

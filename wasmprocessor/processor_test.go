@@ -6,6 +6,7 @@ import (
 
 	"go.opentelemetry.io/collector/component/componenttest"
 	"go.opentelemetry.io/collector/consumer/consumertest"
+	"go.opentelemetry.io/collector/pdata/plog"
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	"go.opentelemetry.io/collector/processor/processortest"
@@ -103,6 +104,7 @@ func TestCreateLogsProcessor(t *testing.T) {
 		t.Errorf("failed to shutdown processor: %v", err)
 	}
 }
+
 func TestProcessTracesWithNopProcessor(t *testing.T) {
 	cfg := createDefaultConfig().(*Config)
 	cfg.Path = "testdata/nop/main.wasm"
@@ -196,6 +198,55 @@ func TestProcessMetricsWithNopProcessor(t *testing.T) {
 	}
 	if processedMetric.Gauge().DataPoints().At(0).IntValue() != 42 {
 		t.Errorf("expected metric value to be 42, got %d", processedMetric.Gauge().DataPoints().At(0).IntValue())
+	}
+}
+
+func TestProcessLogsWithNopProcessor(t *testing.T) {
+	cfg := createDefaultConfig().(*Config)
+	cfg.Path = "testdata/nop/main.wasm"
+	wasmProc, err := newWasmProcessor(context.Background(), cfg)
+	if err != nil {
+		t.Fatalf("failed to create wasm processor: %v", err)
+	}
+
+	// Create test logs with 1 resource, 1 scope, and 1 log record
+	logs := plog.NewLogs()
+	rl := logs.ResourceLogs().AppendEmpty()
+	rl.Resource().Attributes().PutStr("service.name", "test-service")
+	sl := rl.ScopeLogs().AppendEmpty()
+	sl.Scope().SetName("test-scope")
+	logRecord := sl.LogRecords().AppendEmpty()
+	logRecord.SetSeverityText("INFO")
+	logRecord.Body().SetStr("test message")
+
+	// Process the logs
+	processedLogs, err := wasmProc.processLogs(context.Background(), logs)
+	if err != nil {
+		t.Fatalf("failed to process logs: %v", err)
+	}
+
+	// Verify the processed logs
+	processedRL := processedLogs.ResourceLogs()
+	if processedRL.Len() != 1 {
+		t.Fatalf("expected 1 resource log, got %d", processedRL.Len())
+	}
+
+	processedResource := processedRL.At(0).Resource()
+	if val, ok := processedResource.Attributes().Get("service.name"); !ok || val.Str() != "test-service" {
+		t.Errorf("expected service.name to be 'test-service', got %v", val)
+	}
+
+	processedSL := processedRL.At(0).ScopeLogs()
+	if processedSL.Len() != 1 {
+		t.Fatalf("expected 1 scope log, got %d", processedSL.Len())
+	}
+
+	processedLogRecord := processedSL.At(0).LogRecords().At(0)
+	if processedLogRecord.SeverityText() != "INFO" {
+		t.Errorf("expected severity text to be 'INFO', got %s", processedLogRecord.SeverityText())
+	}
+	if processedLogRecord.Body().Str() != "test message" {
+		t.Errorf("expected log message to be 'test message', got %s", processedLogRecord.Body().Str())
 	}
 }
 
