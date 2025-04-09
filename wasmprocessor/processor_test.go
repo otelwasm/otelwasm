@@ -6,6 +6,7 @@ import (
 
 	"go.opentelemetry.io/collector/component/componenttest"
 	"go.opentelemetry.io/collector/consumer/consumertest"
+	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	"go.opentelemetry.io/collector/processor/processortest"
 )
@@ -97,6 +98,55 @@ func TestProcessTracesWithNopProcessor(t *testing.T) {
 	processedSpan := processedSS.At(0).Spans().At(0)
 	if processedSpan.Name() != "test-span" {
 		t.Errorf("expected span name to be 'test-span', got %s", processedSpan.Name())
+	}
+}
+
+func TestProcessMetricsWithNopProcessor(t *testing.T) {
+	cfg := createDefaultConfig().(*Config)
+	cfg.Path = "testdata/nop/main.wasm"
+	wasmProc, err := newWasmProcessor(context.Background(), cfg)
+	if err != nil {
+		t.Fatalf("failed to create wasm processor: %v", err)
+	}
+
+	// Create test metrics with 1 resource, 1 scope, and 1 metric
+	metrics := pmetric.NewMetrics()
+	rm := metrics.ResourceMetrics().AppendEmpty()
+	rm.Resource().Attributes().PutStr("service.name", "test-service")
+	ilm := rm.ScopeMetrics().AppendEmpty()
+	ilm.Scope().SetName("test-scope")
+	metric := ilm.Metrics().AppendEmpty()
+	metric.SetName("test-metric")
+	metric.SetEmptyGauge().DataPoints().AppendEmpty().SetIntValue(42)
+
+	// Process the metrics
+	processedMetrics, err := wasmProc.processMetrics(context.Background(), metrics)
+	if err != nil {
+		t.Fatalf("failed to process metrics: %v", err)
+	}
+
+	// Verify the processed metrics
+	processedRM := processedMetrics.ResourceMetrics()
+	if processedRM.Len() != 1 {
+		t.Fatalf("expected 1 resource metric, got %d", processedRM.Len())
+	}
+
+	processedResource := processedRM.At(0).Resource()
+	if val, ok := processedResource.Attributes().Get("service.name"); !ok || val.Str() != "test-service" {
+		t.Errorf("expected service.name to be 'test-service', got %v", val)
+	}
+
+	processedILM := processedRM.At(0).ScopeMetrics()
+	if processedILM.Len() != 1 {
+		t.Fatalf("expected 1 scope metric, got %d", processedILM.Len())
+	}
+
+	processedMetric := processedILM.At(0).Metrics().At(0)
+	if processedMetric.Name() != "test-metric" {
+		t.Errorf("expected metric name to be 'test-metric', got %s", processedMetric.Name())
+	}
+	if processedMetric.Gauge().DataPoints().At(0).IntValue() != 42 {
+		t.Errorf("expected metric value to be 42, got %d", processedMetric.Gauge().DataPoints().At(0).IntValue())
 	}
 }
 
