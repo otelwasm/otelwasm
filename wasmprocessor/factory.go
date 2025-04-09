@@ -25,7 +25,8 @@ func NewFactory() processor.Factory {
 		typeStr,
 		createDefaultConfig,
 		processor.WithTraces(createTraces, component.StabilityLevelAlpha),
-		// TODO: Implement Metrics and Logs processors
+		processor.WithMetrics(createMetrics, component.StabilityLevelAlpha),
+		// TODO: Implement Logs processors
 	)
 }
 
@@ -41,6 +42,22 @@ func createTraces(
 	}
 	return processorhelper.NewTraces(ctx, set, cfg, nextConsumer,
 		wasmProcessor.processTraces,
+		processorhelper.WithCapabilities(processorCapabilities),
+	)
+}
+
+func createMetrics(
+	ctx context.Context,
+	set processor.Settings,
+	cfg component.Config,
+	nextConsumer consumer.Metrics,
+) (processor.Metrics, error) {
+	wasmProcessor, err := newWasmProcessor(ctx, cfg.(*Config))
+	if err != nil {
+		return nil, err
+	}
+	return processorhelper.NewMetrics(ctx, set, cfg, nextConsumer,
+		wasmProcessor.processMetrics,
 		processorhelper.WithCapabilities(processorCapabilities),
 	)
 }
