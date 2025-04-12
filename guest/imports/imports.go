@@ -1,3 +1,5 @@
+//go:build wasm
+
 package imports
 
 //go:wasmimport opentelemetry.io/wasm getPluginConfig
