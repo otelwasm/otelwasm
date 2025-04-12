@@ -11,3 +11,4 @@ registries:
   ref: v4.336.0 # renovate: depName=aquaproj/aqua-registry
 packages:
 - name: protocolbuffers/protobuf/protoc@v30.2
+- name: nektos/act@v0.2.76
