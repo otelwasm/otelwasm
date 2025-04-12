@@ -19,3 +19,6 @@ func setResultMetrics(ptr, size uint32)
 
 //go:wasmimport opentelemetry.io/wasm setResultLogs
 func setResultLogs(ptr, size uint32)
+
+//go:wasmimport opentelemetry.io/wasm setResultStatusReason
+func setResultStatusReason(ptr, size uint32)

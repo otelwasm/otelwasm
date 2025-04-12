@@ -15,3 +15,11 @@ const (
 	// Exited with unexpected errors.
 	StatusCodeError
 )
+
+func StatusSuccess() *Status {
+	return &Status{Code: StatusCodeSuccess}
+}
+
+func StatusError(reason string) *Status {
+	return &Status{Code: StatusCodeError, Reason: reason}
+}
