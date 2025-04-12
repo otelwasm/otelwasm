@@ -1,3 +1,5 @@
+//go:build wasm
+
 package imports
 
 import "github.com/musaprg/otelwasm/guest/internal/mem"

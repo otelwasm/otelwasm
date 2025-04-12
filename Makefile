@@ -56,6 +56,11 @@ format:
 	@go run $(gofumpt) -l -w .
 	@go run $(gosimports) -local sigs.k8s.io/kube-scheduler-wasm-extension/ -w $(shell find . -name '*.go' -type f)
 
+.PHONY: test
+test:
+	@(cd wasmprocessor; go test -v ./...)
+	@(cd guest; go test -v ./...)
+
 examples/nop/main.wasm: examples/nop/main.go
 	@(cd $(@D); GOOS=wasip1 GOARCH=wasm go build -buildmode=c-shared -o main.wasm ./...)
 
