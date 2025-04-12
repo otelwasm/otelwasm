@@ -44,6 +44,9 @@ func newWasmProcessor(ctx context.Context, cfg *Config) (*wasmProcessor, error) 
 		return nil, err
 	}
 
+	// TODO: We should invoke validate function defined in the guest at the iniitialization time
+	// to check if the plugin config is valid. Currently it's checked every time when the process* function is called.
+
 	f, err := os.Open(cfg.Path)
 	if err != nil {
 		return nil, err
