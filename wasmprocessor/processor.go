@@ -301,3 +301,10 @@ func (wp *wasmProcessor) processLogs(
 
 	return params.resultLogs, nil
 }
+
+func (wp *wasmProcessor) shutdown(ctx context.Context) error {
+	if err := wp.runtime.Close(ctx); err != nil {
+		return fmt.Errorf("wasm: error closing runtime: %w", err)
+	}
+	return nil
+}

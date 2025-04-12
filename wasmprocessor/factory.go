@@ -43,6 +43,7 @@ func createTraces(
 	return processorhelper.NewTraces(ctx, set, cfg, nextConsumer,
 		wasmProcessor.processTraces,
 		processorhelper.WithCapabilities(processorCapabilities),
+		processorhelper.WithShutdown(wasmProcessor.shutdown),
 	)
 }
 
@@ -59,6 +60,7 @@ func createMetrics(
 	return processorhelper.NewMetrics(ctx, set, cfg, nextConsumer,
 		wasmProcessor.processMetrics,
 		processorhelper.WithCapabilities(processorCapabilities),
+		processorhelper.WithShutdown(wasmProcessor.shutdown),
 	)
 }
 
@@ -75,5 +77,6 @@ func createLogs(
 	return processorhelper.NewLogs(ctx, set, cfg, nextConsumer,
 		wasmProcessor.processLogs,
 		processorhelper.WithCapabilities(processorCapabilities),
+		processorhelper.WithShutdown(wasmProcessor.shutdown),
 	)
 }
