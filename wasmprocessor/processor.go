@@ -2,6 +2,7 @@ package wasmprocessor
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -15,20 +16,25 @@ import (
 )
 
 const (
-	guestExportMemory = "memory"
-	otelWasm          = "opentelemetry.io/wasm"
-	currentTraces     = "currentTraces"
-	currentMetrics    = "currentMetrics"
-	currentLogs       = "currentLogs"
-	setResultTraces   = "setResultTraces"
-	setResultMetrics  = "setResultMetrics"
-	setResultLogs     = "setResultLogs"
+	guestExportMemory     = "memory"
+	otelWasm              = "opentelemetry.io/wasm"
+	currentTraces         = "currentTraces"
+	currentMetrics        = "currentMetrics"
+	currentLogs           = "currentLogs"
+	setResultTraces       = "setResultTraces"
+	setResultMetrics      = "setResultMetrics"
+	setResultLogs         = "setResultLogs"
+	getPluginConfig       = "getPluginConfig"
+	setResultStatusReason = "setResultStatusReason"
 )
 
 type wasmProcessor struct {
 	wasmProcessTraces  api.Function
 	wasmProcessMetrics api.Function
 	wasmProcessLogs    api.Function
+
+	// pluginConfigJSON is the JSON representation of the plugin config.
+	pluginConfigJSON []byte
 
 	runtime wazero.Runtime
 }
@@ -37,6 +43,9 @@ func newWasmProcessor(ctx context.Context, cfg *Config) (*wasmProcessor, error) 
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
+
+	// TODO: We should invoke validate function defined in the guest at the iniitialization time
+	// to check if the plugin config is valid. Currently it's checked every time when the process* function is called.
 
 	f, err := os.Open(cfg.Path)
 	if err != nil {
@@ -71,11 +80,22 @@ func newWasmProcessor(ctx context.Context, cfg *Config) (*wasmProcessor, error) 
 	processMetrics := mod.ExportedFunction("processMetrics")
 	processLogs := mod.ExportedFunction("processLogs")
 
+	if processTraces == nil || processMetrics == nil || processLogs == nil {
+		return nil, fmt.Errorf("wasm: guest doesn't export processTraces, processMetrics or processLogs")
+	}
+
+	// Convert the plugin config to JSON representation.
+	pluginConfigJSON, err := json.Marshal(cfg.PluginConfig)
+	if err != nil {
+		return nil, fmt.Errorf("wasm: error marshalling plugin config: %w", err)
+	}
+
 	return &wasmProcessor{
 		runtime:            runtime,
 		wasmProcessTraces:  processTraces,
 		wasmProcessMetrics: processMetrics,
 		wasmProcessLogs:    processLogs,
+		pluginConfigJSON:   pluginConfigJSON,
 	}, nil
 }
 
@@ -116,6 +136,10 @@ type stack struct {
 	resultTraces   ptrace.Traces
 	resultMetrics  pmetric.Metrics
 	resultLogs     plog.Logs
+	statusReason   string
+
+	// pluginConfig is the plugin config in JSON representation passed to the guest.
+	pluginConfigJSON []byte
 }
 
 func paramsFromContext(ctx context.Context) *stack {
@@ -144,6 +168,14 @@ func currentLogsFn(ctx context.Context, mod api.Module, stack []uint64) {
 
 	logs := paramsFromContext(ctx).currentLogs
 	stack[0] = uint64(marshalLogsIfUnderLimit(mod.Memory(), logs, buf, bufLimit))
+}
+
+func getPluginConfigFn(ctx context.Context, mod api.Module, stack []uint64) {
+	buf := uint32(stack[0])
+	bufLimit := bufLimit(stack[1])
+
+	pluginConfig := paramsFromContext(ctx).pluginConfigJSON
+	stack[0] = uint64(writeBytesIfUnderLimit(mod.Memory(), pluginConfig, buf, bufLimit))
 }
 
 func setResultTracesFn(ctx context.Context, mod api.Module, stack []uint64) {
@@ -212,6 +244,21 @@ func setResultLogsFn(ctx context.Context, mod api.Module, stack []uint64) {
 	paramsFromContext(ctx).resultLogs = logs
 }
 
+func setResultStatusReasonFn(ctx context.Context, mod api.Module, stack []uint64) {
+	// Read buffer pointer and size from the stack
+	buf := uint32(stack[0])
+	size := uint32(stack[1])
+
+	// Read the status reason string from WASM memory
+	reasonBytes, ok := mod.Memory().Read(buf, size)
+	if !ok {
+		panic("out of memory reading status reason") // Bug: caller passed a length outside memory
+	}
+
+	// Store the status reason in context
+	paramsFromContext(ctx).statusReason = string(reasonBytes)
+}
+
 func instantiateHostModule(ctx context.Context, runtime wazero.Runtime) (api.Module, error) {
 	return runtime.NewHostModuleBuilder(otelWasm).
 		NewFunctionBuilder().
@@ -232,6 +279,12 @@ func instantiateHostModule(ctx context.Context, runtime wazero.Runtime) (api.Mod
 		NewFunctionBuilder().
 		WithGoModuleFunction(api.GoModuleFunc(setResultLogsFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{}).
 		WithParameterNames("buf", "buf_len").Export(setResultLogs).
+		NewFunctionBuilder().
+		WithGoModuleFunction(api.GoModuleFunc(getPluginConfigFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{api.ValueTypeI32}).
+		WithParameterNames("buf", "buf_limit").Export(getPluginConfig).
+		NewFunctionBuilder().
+		WithGoModuleFunction(api.GoModuleFunc(setResultStatusReasonFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{}).
+		WithParameterNames("buf", "buf_len").Export(setResultStatusReason).
 		Instantiate(ctx)
 }
 
@@ -240,7 +293,8 @@ func (wp *wasmProcessor) processTraces(
 	td ptrace.Traces,
 ) (ptrace.Traces, error) {
 	params := &stack{
-		currentTraces: td,
+		currentTraces:    td,
+		pluginConfigJSON: wp.pluginConfigJSON,
 	}
 	ctx = context.WithValue(ctx, stackKey{}, params)
 
@@ -250,9 +304,9 @@ func (wp *wasmProcessor) processTraces(
 		return td, err
 	}
 
-	statusCode := int32(res[0])
+	statusCode := StatusCode(res[0])
 	if statusCode != 0 {
-		return td, fmt.Errorf("wasm: error processing traces: %d", statusCode)
+		return td, fmt.Errorf("wasm: error processing traces: %s: %s", statusCode.String(), params.statusReason)
 	}
 
 	return params.resultTraces, nil
@@ -263,7 +317,8 @@ func (wp *wasmProcessor) processMetrics(
 	md pmetric.Metrics,
 ) (pmetric.Metrics, error) {
 	params := &stack{
-		currentMetrics: md,
+		currentMetrics:   md,
+		pluginConfigJSON: wp.pluginConfigJSON,
 	}
 	ctx = context.WithValue(ctx, stackKey{}, params)
 
@@ -272,9 +327,9 @@ func (wp *wasmProcessor) processMetrics(
 		return md, err
 	}
 
-	statusCode := int32(res[0])
+	statusCode := StatusCode(res[0])
 	if statusCode != 0 {
-		return md, fmt.Errorf("wasm: error processing metrics: %d", statusCode)
+		return md, fmt.Errorf("wasm: error processing metrics: %s: %s", statusCode.String(), params.statusReason)
 	}
 
 	return params.resultMetrics, nil
@@ -285,7 +340,8 @@ func (wp *wasmProcessor) processLogs(
 	ld plog.Logs,
 ) (plog.Logs, error) {
 	params := &stack{
-		currentLogs: ld,
+		currentLogs:      ld,
+		pluginConfigJSON: wp.pluginConfigJSON,
 	}
 	ctx = context.WithValue(ctx, stackKey{}, params)
 
@@ -294,9 +350,9 @@ func (wp *wasmProcessor) processLogs(
 		return ld, err
 	}
 
-	statusCode := int32(res[0])
+	statusCode := StatusCode(res[0])
 	if statusCode != 0 {
-		return ld, fmt.Errorf("wasm: error processing logs: %d", statusCode)
+		return ld, fmt.Errorf("wasm: error processing logs: %s: %s", statusCode.String(), params.statusReason)
 	}
 
 	return params.resultLogs, nil

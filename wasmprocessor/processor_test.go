@@ -253,6 +253,10 @@ func TestProcessLogsWithNopProcessor(t *testing.T) {
 func TestProcessTracesWithAddNewAttributeProcessor(t *testing.T) {
 	cfg := createDefaultConfig().(*Config)
 	cfg.Path = "testdata/add_new_attribute/main.wasm"
+	cfg.PluginConfig = PluginConfig{
+		"attribute_name":  "new-attribute",
+		"attribute_value": "new-value",
+	}
 	wasmProc, err := newWasmProcessor(context.Background(), cfg)
 	if err != nil {
 		t.Fatalf("failed to create wasm processor: %v", err)
