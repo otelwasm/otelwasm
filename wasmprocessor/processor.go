@@ -7,9 +7,10 @@ import (
 	"io"
 	"os"
 
+	"github.com/stealthrocket/wasi-go"
+	wasigo "github.com/stealthrocket/wasi-go/imports"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"go.opentelemetry.io/collector/pdata/plog"
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.opentelemetry.io/collector/pdata/ptrace"
@@ -37,6 +38,7 @@ type wasmProcessor struct {
 	pluginConfigJSON []byte
 
 	runtime wazero.Runtime
+	sys     wasi.System
 }
 
 func newWasmProcessor(ctx context.Context, cfg *Config) (*wasmProcessor, error) {
@@ -60,6 +62,15 @@ func newWasmProcessor(ctx context.Context, cfg *Config) (*wasmProcessor, error) 
 	runtime, guest, err := prepareRuntime(ctx, bytes)
 	if err != nil {
 		return nil, err
+	}
+
+	// Instantiate WASI module (wasi_snapshot_preview1 and wasmedge socket extension)
+	// TODO: Prepare own wasi_snapshot_preview1 package instead and remove wasi-go dependency in the future.
+	ctx, sys, err := wasigo.NewBuilder().
+		WithSocketsExtension("auto", guest).
+		Instantiate(ctx, runtime)
+	if err != nil {
+		return nil, fmt.Errorf("wasm: error instantiating wasi module: %w", err)
 	}
 
 	if _, err := instantiateHostModule(ctx, runtime); err != nil {
@@ -96,16 +107,12 @@ func newWasmProcessor(ctx context.Context, cfg *Config) (*wasmProcessor, error) 
 		wasmProcessMetrics: processMetrics,
 		wasmProcessLogs:    processLogs,
 		pluginConfigJSON:   pluginConfigJSON,
+		sys:                sys,
 	}, nil
 }
 
 func prepareRuntime(ctx context.Context, guestBin []byte) (runtime wazero.Runtime, guest wazero.CompiledModule, err error) {
 	runtime = wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfig())
-
-	_, err = wasi_snapshot_preview1.Instantiate(ctx, runtime)
-	if err != nil {
-		return nil, nil, err
-	}
 
 	guest, err = compileGuest(ctx, runtime, guestBin)
 	if err != nil {
@@ -359,6 +366,9 @@ func (wp *wasmProcessor) processLogs(
 }
 
 func (wp *wasmProcessor) shutdown(ctx context.Context) error {
+	if err := wp.sys.Close(ctx); err != nil {
+		return fmt.Errorf("wasm: error closing system: %w", err)
+	}
 	if err := wp.runtime.Close(ctx); err != nil {
 		return fmt.Errorf("wasm: error closing runtime: %w", err)
 	}
