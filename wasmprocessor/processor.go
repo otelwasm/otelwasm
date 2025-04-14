@@ -27,6 +27,7 @@ const (
 	setResultLogs         = "setResultLogs"
 	getPluginConfig       = "getPluginConfig"
 	setResultStatusReason = "setResultStatusReason"
+	wasmEdgeV2Extension   = "wasmedgev2"
 )
 
 type wasmProcessor struct {
@@ -68,7 +69,7 @@ func newWasmProcessor(ctx context.Context, cfg *Config) (context.Context, *wasmP
 	// TODO: Prepare own wasi_snapshot_preview1 package instead and remove wasi-go dependency in the future.
 	var sys wasi.System
 	ctx, sys, err = wasigo.NewBuilder().
-		WithSocketsExtension("auto", guest).
+		WithSocketsExtension(wasmEdgeV2Extension, guest).
 		Instantiate(ctx, runtime)
 	if err != nil {
 		return ctx, nil, fmt.Errorf("wasm: error instantiating wasi module: %w", err)
