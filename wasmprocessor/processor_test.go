@@ -3,6 +3,7 @@ package wasmprocessor
 import (
 	"testing"
 
+	"github.com/musaprg/otelwasm/wasmplugin"
 	"go.opentelemetry.io/collector/component/componenttest"
 	"go.opentelemetry.io/collector/consumer/consumertest"
 	"go.opentelemetry.io/collector/pdata/plog"
@@ -285,7 +286,7 @@ func TestProcessLogsWithNopProcessor(t *testing.T) {
 func TestProcessTracesWithAddNewAttributeProcessor(t *testing.T) {
 	cfg := createDefaultConfig().(*Config)
 	cfg.Path = "testdata/add_new_attribute/main.wasm"
-	cfg.PluginConfig = PluginConfig{
+	cfg.PluginConfig = wasmplugin.PluginConfig{
 		"attribute_name":  "new-attribute",
 		"attribute_value": "new-value",
 	}

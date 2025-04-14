@@ -1,0 +1,385 @@
+// Package wasmplugin provides common functionality for WebAssembly-based OpenTelemetry components.
+package wasmplugin
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"os"
+
+	"github.com/stealthrocket/wasi-go"
+	wasigo "github.com/stealthrocket/wasi-go/imports"
+	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/api"
+	"go.opentelemetry.io/collector/pdata/plog"
+	"go.opentelemetry.io/collector/pdata/pmetric"
+	"go.opentelemetry.io/collector/pdata/ptrace"
+)
+
+// PluginConfig is a generic configuration type that can be passed to WASM modules
+type PluginConfig map[string]interface{}
+
+const (
+	// guestExportMemory is the name of the memory export in the guest module
+	guestExportMemory = "memory"
+
+	// otelWasm is the name of the host module
+	otelWasm = "opentelemetry.io/wasm"
+
+	// Host function exports
+	currentTraces         = "currentTraces"
+	currentMetrics        = "currentMetrics"
+	currentLogs           = "currentLogs"
+	setResultTraces       = "setResultTraces"
+	setResultMetrics      = "setResultMetrics"
+	setResultLogs         = "setResultLogs"
+	getPluginConfig       = "getPluginConfig"
+	setResultStatusReason = "setResultStatusReason"
+
+	// WASI extension name
+	wasmEdgeV2Extension = "wasmedgev2"
+)
+
+// Config defines the common configuration for WASM components
+type Config struct {
+	// Path to the WASM module file
+	Path string `mapstructure:"path"`
+
+	// PluginConfig is the configuration to be passed to the WASM module
+	PluginConfig PluginConfig `mapstructure:"plugin_config"`
+}
+
+// Validate validates the configuration
+func (cfg *Config) Validate() error {
+	if cfg.Path == "" {
+		return fmt.Errorf("path is required")
+	}
+	return nil
+}
+
+// StatusCode represents the result status code from WASM function calls
+type StatusCode uint32
+
+// String returns the string representation of the status code
+func (s StatusCode) String() string {
+	switch s {
+	case 0:
+		return "OK"
+	case 1:
+		return "ERROR"
+	case 2:
+		return "INVALID_ARGUMENT"
+	default:
+		return fmt.Sprintf("UNKNOWN(%d)", s)
+	}
+}
+
+// WasmPlugin represents a WebAssembly plugin for OpenTelemetry components
+type WasmPlugin struct {
+	// Runtime is the WebAssembly runtime
+	Runtime wazero.Runtime
+
+	// System is the WASI system implementation
+	Sys wasi.System
+
+	// Module is the instantiated WASM module
+	Module api.Module
+
+	// PluginConfigJSON is the JSON representation of the plugin config
+	PluginConfigJSON []byte
+
+	// Exported functions from the WASM module
+	ExportedFunctions map[string]api.Function
+}
+
+// stackKey is the key used to store the stack in the context
+type stackKey struct{}
+
+// Stack holds the data being passed between the host and the guest
+type Stack struct {
+	CurrentTraces  ptrace.Traces
+	CurrentMetrics pmetric.Metrics
+	CurrentLogs    plog.Logs
+	ResultTraces   ptrace.Traces
+	ResultMetrics  pmetric.Metrics
+	ResultLogs     plog.Logs
+	StatusReason   string
+
+	// PluginConfigJSON is the plugin config in JSON representation passed to the guest
+	PluginConfigJSON []byte
+}
+
+// paramsFromContext retrieves the Stack from the context
+func paramsFromContext(ctx context.Context) *Stack {
+	return ctx.Value(stackKey{}).(*Stack)
+}
+
+// NewWasmPlugin creates a new WasmPlugin instance
+func NewWasmPlugin(ctx context.Context, cfg *Config, requiredFunctions []string) (context.Context, *WasmPlugin, error) {
+	if err := cfg.Validate(); err != nil {
+		return ctx, nil, err
+	}
+
+	f, err := os.Open(cfg.Path)
+	if err != nil {
+		return ctx, nil, err
+	}
+	defer f.Close()
+
+	bytes, err := io.ReadAll(f)
+	if err != nil {
+		return ctx, nil, err
+	}
+
+	runtime, guest, err := prepareRuntime(ctx, bytes)
+	if err != nil {
+		return ctx, nil, err
+	}
+
+	// Instantiate WASI module (wasi_snapshot_preview1 and wasmedge socket extension)
+	var sys wasi.System
+	ctx, sys, err = wasigo.NewBuilder().
+		WithSocketsExtension(wasmEdgeV2Extension, guest).
+		Instantiate(ctx, runtime)
+	if err != nil {
+		return ctx, nil, fmt.Errorf("wasm: error instantiating wasi module: %w", err)
+	}
+
+	if _, err := instantiateHostModule(ctx, runtime); err != nil {
+		return ctx, nil, fmt.Errorf("wasm: error instantiating host module: %w", err)
+	}
+
+	config := wazero.NewModuleConfig().
+		WithStartFunctions("_initialize"). // reactor module
+		WithStdout(os.Stdout).
+		WithStderr(os.Stderr)
+
+	mod, err := runtime.InstantiateModule(ctx, guest, config)
+	if err != nil {
+		return ctx, nil, fmt.Errorf("wasm: error instantiating guest: %w", err)
+	}
+
+	// Check if all required functions are exported
+	exportedFunctions := make(map[string]api.Function)
+	for _, funcName := range requiredFunctions {
+		fn := mod.ExportedFunction(funcName)
+		if fn == nil {
+			return ctx, nil, fmt.Errorf("wasm: guest doesn't export required function: %s", funcName)
+		}
+		exportedFunctions[funcName] = fn
+	}
+
+	// Convert the plugin config to JSON representation
+	pluginConfigJSON, err := json.Marshal(cfg.PluginConfig)
+	if err != nil {
+		return ctx, nil, fmt.Errorf("wasm: error marshalling plugin config: %w", err)
+	}
+
+	plugin := &WasmPlugin{
+		Runtime:           runtime,
+		Sys:               sys,
+		Module:            mod,
+		PluginConfigJSON:  pluginConfigJSON,
+		ExportedFunctions: exportedFunctions,
+	}
+
+	return ctx, plugin, nil
+}
+
+// prepareRuntime initializes a new WebAssembly runtime
+func prepareRuntime(ctx context.Context, guestBin []byte) (runtime wazero.Runtime, guest wazero.CompiledModule, err error) {
+	runtime = wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfig())
+
+	guest, err = compileGuest(ctx, runtime, guestBin)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return runtime, guest, nil
+}
+
+// compileGuest compiles the guest module
+func compileGuest(ctx context.Context, runtime wazero.Runtime, guestBin []byte) (guest wazero.CompiledModule, err error) {
+	if guest, err = runtime.CompileModule(ctx, guestBin); err != nil {
+		err = fmt.Errorf("wasm: error compiling guest: %w", err)
+	} else if _, ok := guest.ExportedMemories()[guestExportMemory]; !ok {
+		// This section checks if the guest exports memory section.
+		// As of WebAssembly Core Specification 2.0, there can be at most one memory.
+		// https://webassembly.github.io/spec/core/syntax/modules.html#memories
+		err = fmt.Errorf("wasm: guest doesn't export memory[%s]", guestExportMemory)
+	}
+	return
+}
+
+// createContextWithStack creates a new context with a Stack
+func createContextWithStack(ctx context.Context, stack *Stack) context.Context {
+	return context.WithValue(ctx, stackKey{}, stack)
+}
+
+// ProcessFunctionCall executes a WASM function and handles stack management
+func (p *WasmPlugin) ProcessFunctionCall(ctx context.Context, functionName string, stack *Stack) ([]uint64, error) {
+	ctx = createContextWithStack(ctx, stack)
+
+	fn, ok := p.ExportedFunctions[functionName]
+	if !ok {
+		return nil, fmt.Errorf("wasm: function not found: %s", functionName)
+	}
+
+	return fn.Call(ctx)
+}
+
+// Shutdown closes the WASM runtime and system
+func (p *WasmPlugin) Shutdown(ctx context.Context) error {
+	if err := p.Sys.Close(ctx); err != nil {
+		return fmt.Errorf("wasm: error closing system: %w", err)
+	}
+	if err := p.Runtime.Close(ctx); err != nil {
+		return fmt.Errorf("wasm: error closing runtime: %w", err)
+	}
+	return nil
+}
+
+// Host function implementations
+func currentTracesFn(ctx context.Context, mod api.Module, stack []uint64) {
+	buf := uint32(stack[0])
+	bufLimit := uint32(stack[1])
+
+	traces := paramsFromContext(ctx).CurrentTraces
+	stack[0] = uint64(marshalTraceIfUnderLimit(mod.Memory(), traces, buf, bufLimit))
+}
+
+func currentMetricsFn(ctx context.Context, mod api.Module, stack []uint64) {
+	buf := uint32(stack[0])
+	bufLimit := uint32(stack[1])
+
+	metrics := paramsFromContext(ctx).CurrentMetrics
+	stack[0] = uint64(marshalMetricsIfUnderLimit(mod.Memory(), metrics, buf, bufLimit))
+}
+
+func currentLogsFn(ctx context.Context, mod api.Module, stack []uint64) {
+	buf := uint32(stack[0])
+	bufLimit := uint32(stack[1])
+
+	logs := paramsFromContext(ctx).CurrentLogs
+	stack[0] = uint64(marshalLogsIfUnderLimit(mod.Memory(), logs, buf, bufLimit))
+}
+
+func getPluginConfigFn(ctx context.Context, mod api.Module, stack []uint64) {
+	buf := uint32(stack[0])
+	bufLimit := uint32(stack[1])
+
+	pluginConfig := paramsFromContext(ctx).PluginConfigJSON
+	stack[0] = uint64(writeBytesIfUnderLimit(mod.Memory(), pluginConfig, buf, bufLimit))
+}
+
+func setResultTracesFn(ctx context.Context, mod api.Module, stack []uint64) {
+	// Read buffer pointer and size from the stack
+	buf := uint32(stack[0])
+	size := uint32(stack[1])
+
+	// Read the serialized traces from WASM memory
+	tracesBytes, ok := mod.Memory().Read(buf, size)
+	if !ok {
+		panic("out of memory reading result traces") // Bug: caller passed a length outside memory
+	}
+
+	// Unmarshal the traces
+	unmarshaler := ptrace.ProtoUnmarshaler{}
+	traces, err := unmarshaler.UnmarshalTraces(tracesBytes)
+	if err != nil {
+		panic(err) // Bug: in unmarshaller
+	}
+
+	// Store the result traces in context
+	paramsFromContext(ctx).ResultTraces = traces
+}
+
+func setResultMetricsFn(ctx context.Context, mod api.Module, stack []uint64) {
+	// Read buffer pointer and size from the stack
+	buf := uint32(stack[0])
+	size := uint32(stack[1])
+
+	// Read the serialized metrics from WASM memory
+	metricsBytes, ok := mod.Memory().Read(buf, size)
+	if !ok {
+		panic("out of memory reading result metrics") // Bug: caller passed a length outside memory
+	}
+
+	// Unmarshal the metrics
+	unmarshaler := pmetric.ProtoUnmarshaler{}
+	metrics, err := unmarshaler.UnmarshalMetrics(metricsBytes)
+	if err != nil {
+		panic(err) // Bug: in unmarshaller
+	}
+
+	// Store the result metrics in context
+	paramsFromContext(ctx).ResultMetrics = metrics
+}
+
+func setResultLogsFn(ctx context.Context, mod api.Module, stack []uint64) {
+	// Read buffer pointer and size from the stack
+	buf := uint32(stack[0])
+	size := uint32(stack[1])
+
+	// Read the serialized logs from WASM memory
+	logsBytes, ok := mod.Memory().Read(buf, size)
+	if !ok {
+		panic("out of memory reading result logs") // Bug: caller passed a length outside memory
+	}
+
+	// Unmarshal the logs
+	unmarshaler := plog.ProtoUnmarshaler{}
+	logs, err := unmarshaler.UnmarshalLogs(logsBytes)
+	if err != nil {
+		panic(err) // Bug: in unmarshaller
+	}
+
+	// Store the result logs in context
+	paramsFromContext(ctx).ResultLogs = logs
+}
+
+func setResultStatusReasonFn(ctx context.Context, mod api.Module, stack []uint64) {
+	// Read buffer pointer and size from the stack
+	buf := uint32(stack[0])
+	size := uint32(stack[1])
+
+	// Read the status reason string from WASM memory
+	reasonBytes, ok := mod.Memory().Read(buf, size)
+	if !ok {
+		panic("out of memory reading status reason") // Bug: caller passed a length outside memory
+	}
+
+	// Store the status reason in context
+	paramsFromContext(ctx).StatusReason = string(reasonBytes)
+}
+
+// instantiateHostModule creates and instantiates the host module with exported functions
+func instantiateHostModule(ctx context.Context, runtime wazero.Runtime) (api.Module, error) {
+	return runtime.NewHostModuleBuilder(otelWasm).
+		NewFunctionBuilder().
+		WithGoModuleFunction(api.GoModuleFunc(currentTracesFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{api.ValueTypeI32}).
+		WithParameterNames("buf", "buf_limit").Export(currentTraces).
+		NewFunctionBuilder().
+		WithGoModuleFunction(api.GoModuleFunc(currentMetricsFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{api.ValueTypeI32}).
+		WithParameterNames("buf", "buf_limit").Export(currentMetrics).
+		NewFunctionBuilder().
+		WithGoModuleFunction(api.GoModuleFunc(currentLogsFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{api.ValueTypeI32}).
+		WithParameterNames("buf", "buf_limit").Export(currentLogs).
+		NewFunctionBuilder().
+		WithGoModuleFunction(api.GoModuleFunc(setResultTracesFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{}).
+		WithParameterNames("buf", "buf_len").Export(setResultTraces).
+		NewFunctionBuilder().
+		WithGoModuleFunction(api.GoModuleFunc(setResultMetricsFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{}).
+		WithParameterNames("buf", "buf_len").Export(setResultMetrics).
+		NewFunctionBuilder().
+		WithGoModuleFunction(api.GoModuleFunc(setResultLogsFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{}).
+		WithParameterNames("buf", "buf_len").Export(setResultLogs).
+		NewFunctionBuilder().
+		WithGoModuleFunction(api.GoModuleFunc(getPluginConfigFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{api.ValueTypeI32}).
+		WithParameterNames("buf", "buf_limit").Export(getPluginConfig).
+		NewFunctionBuilder().
+		WithGoModuleFunction(api.GoModuleFunc(setResultStatusReasonFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{}).
+		WithParameterNames("buf", "buf_len").Export(setResultStatusReason).
+		Instantiate(ctx)
+}
