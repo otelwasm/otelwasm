@@ -66,3 +66,6 @@ examples/nop/main.wasm: examples/nop/main.go
 
 examples/add_new_attribute/main.wasm: examples/add_new_attribute/main.go
 	@(cd $(@D); GOOS=wasip1 GOARCH=wasm go build -buildmode=c-shared -o main.wasm ./...)
+
+examples/curl/main.wasm: examples/curl/main.go
+	@(cd $(@D); GOOS=wasip1 GOARCH=wasm go build -buildmode=c-shared -o main.wasm ./...)

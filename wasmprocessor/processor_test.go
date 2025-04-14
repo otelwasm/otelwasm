@@ -152,6 +152,24 @@ func TestProcessTracesWithNopProcessor(t *testing.T) {
 	}
 }
 
+func TestProcessTracesWithCurlProcessor(t *testing.T) {
+	cfg := createDefaultConfig().(*Config)
+	cfg.Path = "testdata/curl/main.wasm"
+	wasmProc, err := newWasmProcessor(context.Background(), cfg)
+	if err != nil {
+		t.Fatalf("failed to create wasm processor: %v", err)
+	}
+
+	// Create test traces with 1 resource, 1 scope, and 1 span
+	traces := ptrace.NewTraces()
+
+	// Process the traces
+	_, err = wasmProc.processTraces(context.Background(), traces)
+	if err != nil {
+		t.Fatalf("failed to process traces: %v", err)
+	}
+}
+
 func TestProcessMetricsWithNopProcessor(t *testing.T) {
 	cfg := createDefaultConfig().(*Config)
 	cfg.Path = "testdata/nop/main.wasm"

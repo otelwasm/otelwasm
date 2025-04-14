@@ -66,7 +66,8 @@ func newWasmProcessor(ctx context.Context, cfg *Config) (*wasmProcessor, error) 
 
 	// Instantiate WASI module (wasi_snapshot_preview1 and wasmedge socket extension)
 	// TODO: Prepare own wasi_snapshot_preview1 package instead and remove wasi-go dependency in the future.
-	ctx, sys, err := wasigo.NewBuilder().
+	var sys wasi.System
+	ctx, sys, err = wasigo.NewBuilder().
 		WithSocketsExtension("auto", guest).
 		Instantiate(ctx, runtime)
 	if err != nil {
