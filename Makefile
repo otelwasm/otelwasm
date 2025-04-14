@@ -68,4 +68,5 @@ examples/add_new_attribute/main.wasm: examples/add_new_attribute/main.go
 	@(cd $(@D); GOOS=wasip1 GOARCH=wasm go build -buildmode=c-shared -o main.wasm ./...)
 
 examples/curl/main.wasm: examples/curl/main.go
-	@(cd $(@D); GOOS=wasip1 GOARCH=wasm go build -buildmode=c-shared -o main.wasm ./...)
+	# getaddrinfo buildtag is necessary to use sock_getaddrinfo for name resolution
+	@(cd $(@D); GOOS=wasip1 GOARCH=wasm go build -buildmode=c-shared -tags="getaddrinfo" -o main.wasm ./...)
