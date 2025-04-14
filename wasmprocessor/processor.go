@@ -7,9 +7,10 @@ import (
 	"io"
 	"os"
 
+	"github.com/stealthrocket/wasi-go"
+	wasigo "github.com/stealthrocket/wasi-go/imports"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
-	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"go.opentelemetry.io/collector/pdata/plog"
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.opentelemetry.io/collector/pdata/ptrace"
@@ -26,6 +27,7 @@ const (
 	setResultLogs         = "setResultLogs"
 	getPluginConfig       = "getPluginConfig"
 	setResultStatusReason = "setResultStatusReason"
+	wasmEdgeV2Extension   = "wasmedgev2"
 )
 
 type wasmProcessor struct {
@@ -37,11 +39,12 @@ type wasmProcessor struct {
 	pluginConfigJSON []byte
 
 	runtime wazero.Runtime
+	sys     wasi.System
 }
 
-func newWasmProcessor(ctx context.Context, cfg *Config) (*wasmProcessor, error) {
+func newWasmProcessor(ctx context.Context, cfg *Config) (context.Context, *wasmProcessor, error) {
 	if err := cfg.Validate(); err != nil {
-		return nil, err
+		return ctx, nil, err
 	}
 
 	// TODO: We should invoke validate function defined in the guest at the iniitialization time
@@ -49,21 +52,31 @@ func newWasmProcessor(ctx context.Context, cfg *Config) (*wasmProcessor, error) 
 
 	f, err := os.Open(cfg.Path)
 	if err != nil {
-		return nil, err
+		return ctx, nil, err
 	}
 	defer f.Close()
 	bytes, err := io.ReadAll(f)
 	if err != nil {
-		return nil, err
+		return ctx, nil, err
 	}
 
 	runtime, guest, err := prepareRuntime(ctx, bytes)
 	if err != nil {
-		return nil, err
+		return ctx, nil, err
+	}
+
+	// Instantiate WASI module (wasi_snapshot_preview1 and wasmedge socket extension)
+	// TODO: Prepare own wasi_snapshot_preview1 package instead and remove wasi-go dependency in the future.
+	var sys wasi.System
+	ctx, sys, err = wasigo.NewBuilder().
+		WithSocketsExtension(wasmEdgeV2Extension, guest).
+		Instantiate(ctx, runtime)
+	if err != nil {
+		return ctx, nil, fmt.Errorf("wasm: error instantiating wasi module: %w", err)
 	}
 
 	if _, err := instantiateHostModule(ctx, runtime); err != nil {
-		return nil, fmt.Errorf("wasm: error instantiating host module: %w", err)
+		return ctx, nil, fmt.Errorf("wasm: error instantiating host module: %w", err)
 	}
 
 	config := wazero.NewModuleConfig().
@@ -72,7 +85,7 @@ func newWasmProcessor(ctx context.Context, cfg *Config) (*wasmProcessor, error) 
 		WithStderr(os.Stderr)
 	mod, err := runtime.InstantiateModule(ctx, guest, config)
 	if err != nil {
-		return nil, fmt.Errorf("wasm: error instantiating guest: %w", err)
+		return ctx, nil, fmt.Errorf("wasm: error instantiating guest: %w", err)
 	}
 
 	// TODO: Check the type of processors based on the exported functions becuase some processors might not support all telemetry types.
@@ -81,31 +94,27 @@ func newWasmProcessor(ctx context.Context, cfg *Config) (*wasmProcessor, error) 
 	processLogs := mod.ExportedFunction("processLogs")
 
 	if processTraces == nil || processMetrics == nil || processLogs == nil {
-		return nil, fmt.Errorf("wasm: guest doesn't export processTraces, processMetrics or processLogs")
+		return ctx, nil, fmt.Errorf("wasm: guest doesn't export processTraces, processMetrics or processLogs")
 	}
 
 	// Convert the plugin config to JSON representation.
 	pluginConfigJSON, err := json.Marshal(cfg.PluginConfig)
 	if err != nil {
-		return nil, fmt.Errorf("wasm: error marshalling plugin config: %w", err)
+		return ctx, nil, fmt.Errorf("wasm: error marshalling plugin config: %w", err)
 	}
 
-	return &wasmProcessor{
+	return ctx, &wasmProcessor{
 		runtime:            runtime,
 		wasmProcessTraces:  processTraces,
 		wasmProcessMetrics: processMetrics,
 		wasmProcessLogs:    processLogs,
 		pluginConfigJSON:   pluginConfigJSON,
+		sys:                sys,
 	}, nil
 }
 
 func prepareRuntime(ctx context.Context, guestBin []byte) (runtime wazero.Runtime, guest wazero.CompiledModule, err error) {
 	runtime = wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfig())
-
-	_, err = wasi_snapshot_preview1.Instantiate(ctx, runtime)
-	if err != nil {
-		return nil, nil, err
-	}
 
 	guest, err = compileGuest(ctx, runtime, guestBin)
 	if err != nil {
@@ -359,6 +368,9 @@ func (wp *wasmProcessor) processLogs(
 }
 
 func (wp *wasmProcessor) shutdown(ctx context.Context) error {
+	if err := wp.sys.Close(ctx); err != nil {
+		return fmt.Errorf("wasm: error closing system: %w", err)
+	}
 	if err := wp.runtime.Close(ctx); err != nil {
 		return fmt.Errorf("wasm: error closing runtime: %w", err)
 	}
