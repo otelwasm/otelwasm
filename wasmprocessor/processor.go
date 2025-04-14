@@ -41,9 +41,9 @@ type wasmProcessor struct {
 	sys     wasi.System
 }
 
-func newWasmProcessor(ctx context.Context, cfg *Config) (*wasmProcessor, error) {
+func newWasmProcessor(ctx context.Context, cfg *Config) (context.Context, *wasmProcessor, error) {
 	if err := cfg.Validate(); err != nil {
-		return nil, err
+		return ctx, nil, err
 	}
 
 	// TODO: We should invoke validate function defined in the guest at the iniitialization time
@@ -51,17 +51,17 @@ func newWasmProcessor(ctx context.Context, cfg *Config) (*wasmProcessor, error) 
 
 	f, err := os.Open(cfg.Path)
 	if err != nil {
-		return nil, err
+		return ctx, nil, err
 	}
 	defer f.Close()
 	bytes, err := io.ReadAll(f)
 	if err != nil {
-		return nil, err
+		return ctx, nil, err
 	}
 
 	runtime, guest, err := prepareRuntime(ctx, bytes)
 	if err != nil {
-		return nil, err
+		return ctx, nil, err
 	}
 
 	// Instantiate WASI module (wasi_snapshot_preview1 and wasmedge socket extension)
@@ -71,11 +71,11 @@ func newWasmProcessor(ctx context.Context, cfg *Config) (*wasmProcessor, error) 
 		WithSocketsExtension("auto", guest).
 		Instantiate(ctx, runtime)
 	if err != nil {
-		return nil, fmt.Errorf("wasm: error instantiating wasi module: %w", err)
+		return ctx, nil, fmt.Errorf("wasm: error instantiating wasi module: %w", err)
 	}
 
 	if _, err := instantiateHostModule(ctx, runtime); err != nil {
-		return nil, fmt.Errorf("wasm: error instantiating host module: %w", err)
+		return ctx, nil, fmt.Errorf("wasm: error instantiating host module: %w", err)
 	}
 
 	config := wazero.NewModuleConfig().
@@ -84,7 +84,7 @@ func newWasmProcessor(ctx context.Context, cfg *Config) (*wasmProcessor, error) 
 		WithStderr(os.Stderr)
 	mod, err := runtime.InstantiateModule(ctx, guest, config)
 	if err != nil {
-		return nil, fmt.Errorf("wasm: error instantiating guest: %w", err)
+		return ctx, nil, fmt.Errorf("wasm: error instantiating guest: %w", err)
 	}
 
 	// TODO: Check the type of processors based on the exported functions becuase some processors might not support all telemetry types.
@@ -93,16 +93,16 @@ func newWasmProcessor(ctx context.Context, cfg *Config) (*wasmProcessor, error) 
 	processLogs := mod.ExportedFunction("processLogs")
 
 	if processTraces == nil || processMetrics == nil || processLogs == nil {
-		return nil, fmt.Errorf("wasm: guest doesn't export processTraces, processMetrics or processLogs")
+		return ctx, nil, fmt.Errorf("wasm: guest doesn't export processTraces, processMetrics or processLogs")
 	}
 
 	// Convert the plugin config to JSON representation.
 	pluginConfigJSON, err := json.Marshal(cfg.PluginConfig)
 	if err != nil {
-		return nil, fmt.Errorf("wasm: error marshalling plugin config: %w", err)
+		return ctx, nil, fmt.Errorf("wasm: error marshalling plugin config: %w", err)
 	}
 
-	return &wasmProcessor{
+	return ctx, &wasmProcessor{
 		runtime:            runtime,
 		wasmProcessTraces:  processTraces,
 		wasmProcessMetrics: processMetrics,
