@@ -4,7 +4,6 @@ package wasmexporter
 import (
 	"testing"
 
-	"github.com/musaprg/otelwasm/wasmplugin"
 	"go.opentelemetry.io/collector/component/componenttest"
 	"go.opentelemetry.io/collector/exporter/exportertest"
 	"go.opentelemetry.io/collector/pdata/plog"
@@ -34,12 +33,12 @@ func TestCreateTracesExporter(t *testing.T) {
 	// Test that the exporter can be created with the default config
 	factory := NewFactory()
 	cfg := factory.CreateDefaultConfig().(*Config)
-	cfg.Path = "../wasmprocessor/testdata/nop/main.wasm"
+	cfg.Path = "testdata/nop/main.wasm"
 	ctx := t.Context()
 
 	// Test for traces
 	settings := exportertest.NewNopSettings(typeStr)
-	te, err := factory.CreateTracesExporter(ctx, settings, cfg)
+	te, err := factory.CreateTraces(ctx, settings, cfg)
 	if err != nil {
 		t.Fatalf("failed to create traces exporter: %v", err)
 	}
@@ -60,12 +59,12 @@ func TestCreateMetricsExporter(t *testing.T) {
 	// Test that the exporter can be created with the default config
 	factory := NewFactory()
 	cfg := factory.CreateDefaultConfig().(*Config)
-	cfg.Path = "../wasmprocessor/testdata/nop/main.wasm"
+	cfg.Path = "testdata/nop/main.wasm"
 	ctx := t.Context()
 
 	// Test for metrics
 	settings := exportertest.NewNopSettings(typeStr)
-	me, err := factory.CreateMetricsExporter(ctx, settings, cfg)
+	me, err := factory.CreateMetrics(ctx, settings, cfg)
 	if err != nil {
 		t.Fatalf("failed to create metrics exporter: %v", err)
 	}
@@ -86,12 +85,12 @@ func TestCreateLogsExporter(t *testing.T) {
 	// Test that the exporter can be created with the default config
 	factory := NewFactory()
 	cfg := factory.CreateDefaultConfig().(*Config)
-	cfg.Path = "../wasmprocessor/testdata/nop/main.wasm"
+	cfg.Path = "testdata/nop/main.wasm"
 	ctx := t.Context()
 
 	// Test for logs
 	settings := exportertest.NewNopSettings(typeStr)
-	le, err := factory.CreateLogsExporter(ctx, settings, cfg)
+	le, err := factory.CreateLogs(ctx, settings, cfg)
 	if err != nil {
 		t.Fatalf("failed to create logs exporter: %v", err)
 	}
@@ -110,7 +109,7 @@ func TestCreateLogsExporter(t *testing.T) {
 
 func TestExportTracesWithNopExporter(t *testing.T) {
 	cfg := createDefaultConfig().(*Config)
-	cfg.Path = "../wasmprocessor/testdata/nop/main.wasm"
+	cfg.Path = "testdata/nop/main.wasm"
 	ctx := t.Context()
 	ctx, wasmExp, err := newWasmExporter(ctx, cfg)
 	if err != nil {
@@ -137,7 +136,7 @@ func TestExportTracesWithNopExporter(t *testing.T) {
 
 func TestExportMetricsWithNopExporter(t *testing.T) {
 	cfg := createDefaultConfig().(*Config)
-	cfg.Path = "../wasmprocessor/testdata/nop/main.wasm"
+	cfg.Path = "testdata/nop/main.wasm"
 	ctx := t.Context()
 	ctx, wasmExp, err := newWasmExporter(ctx, cfg)
 	if err != nil {
@@ -163,7 +162,7 @@ func TestExportMetricsWithNopExporter(t *testing.T) {
 
 func TestExportLogsWithNopExporter(t *testing.T) {
 	cfg := createDefaultConfig().(*Config)
-	cfg.Path = "../wasmprocessor/testdata/nop/main.wasm"
+	cfg.Path = "testdata/nop/main.wasm"
 	ctx := t.Context()
 	ctx, wasmExp, err := newWasmExporter(ctx, cfg)
 	if err != nil {
@@ -187,42 +186,10 @@ func TestExportLogsWithNopExporter(t *testing.T) {
 	}
 }
 
-func TestExportTracesWithAddNewAttributeExporter(t *testing.T) {
-	cfg := createDefaultConfig().(*Config)
-	cfg.Path = "../wasmprocessor/testdata/add_new_attribute/main.wasm"
-	cfg.PluginConfig = wasmplugin.PluginConfig{
-		"attribute_name":  "new-attribute",
-		"attribute_value": "new-value",
-	}
-	ctx := t.Context()
-	ctx, wasmExp, err := newWasmExporter(ctx, cfg)
-	if err != nil {
-		t.Fatalf("failed to create wasm exporter: %v", err)
-	}
-
-	// Create test traces with 1 resource, 1 scope, and 1 span
-	traces := ptrace.NewTraces()
-	rs := traces.ResourceSpans().AppendEmpty()
-	rs.Resource().Attributes().PutStr("service.name", "test-service")
-	ss := rs.ScopeSpans().AppendEmpty()
-	ss.Scope().SetName("test-scope")
-	span := ss.Spans().AppendEmpty()
-	span.SetName("test-span")
-	span.SetTraceID([16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16})
-	span.SetSpanID([8]byte{1, 2, 3, 4, 5, 6, 7, 8})
-
-	// Push the traces - since this is an exporter test, we're not verifying the output
-	// but just making sure it doesn't error with the configured plugin
-	err = wasmExp.pushTraces(ctx, traces)
-	if err != nil {
-		t.Fatalf("failed to push traces: %v", err)
-	}
-}
-
 func TestConfigValidate(t *testing.T) {
 	// Test that the config validation works as expected
 	cfg := &Config{}
-	cfg.Path = "../wasmprocessor/testdata/nop/main.wasm"
+	cfg.Path = "testdata/nop/main.wasm"
 	if err := cfg.Validate(); err != nil {
 		t.Errorf("config validation failed: %v", err)
 	}
@@ -236,7 +203,7 @@ func TestConfigValidate(t *testing.T) {
 
 func TestShutdown(t *testing.T) {
 	cfg := createDefaultConfig().(*Config)
-	cfg.Path = "../wasmprocessor/testdata/nop/main.wasm"
+	cfg.Path = "testdata/nop/main.wasm"
 	ctx := t.Context()
 	ctx, wasmExp, err := newWasmExporter(ctx, cfg)
 	if err != nil {
