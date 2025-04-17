@@ -61,12 +61,12 @@ test:
 	@(cd wasmprocessor; go test -v ./...)
 	@(cd guest; go test -v ./...)
 
-examples/nop/main.wasm: examples/nop/main.go
+examples/processor/nop/main.wasm: examples/processor/nop/main.go
 	@(cd $(@D); GOOS=wasip1 GOARCH=wasm go build -buildmode=c-shared -o main.wasm ./...)
 
-examples/add_new_attribute/main.wasm: examples/add_new_attribute/main.go
+examples/processor/add_new_attribute/main.wasm: examples/processor/add_new_attribute/main.go
 	@(cd $(@D); GOOS=wasip1 GOARCH=wasm go build -buildmode=c-shared -o main.wasm ./...)
 
-examples/curl/main.wasm: examples/curl/main.go
+examples/processor/curl/main.wasm: examples/processor/curl/main.go
 	# getaddrinfo buildtag is necessary to use sock_getaddrinfo for name resolution
 	@(cd $(@D); GOOS=wasip1 GOARCH=wasm go build -buildmode=c-shared -tags="getaddrinfo" -o main.wasm ./...)
