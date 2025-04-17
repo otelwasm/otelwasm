@@ -186,6 +186,85 @@ func TestExportLogsWithNopExporter(t *testing.T) {
 	}
 }
 
+func TestExportTracesWithStdoutExporter(t *testing.T) {
+	cfg := createDefaultConfig().(*Config)
+	cfg.Path = "testdata/stdout/main.wasm"
+	ctx := t.Context()
+	ctx, wasmExp, err := newWasmExporter(ctx, cfg)
+	if err != nil {
+		t.Fatalf("failed to create wasm exporter: %v", err)
+	}
+
+	// Create test traces with 1 resource, 1 scope, and 1 span
+	traces := ptrace.NewTraces()
+	rs := traces.ResourceSpans().AppendEmpty()
+	rs.Resource().Attributes().PutStr("service.name", "test-service")
+	ss := rs.ScopeSpans().AppendEmpty()
+	ss.Scope().SetName("test-scope")
+	span := ss.Spans().AppendEmpty()
+	span.SetName("test-span")
+	span.SetTraceID([16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16})
+	span.SetSpanID([8]byte{1, 2, 3, 4, 5, 6, 7, 8})
+
+	// Push the traces
+	err = wasmExp.pushTraces(ctx, traces)
+	if err != nil {
+		t.Fatalf("failed to push traces: %v", err)
+	}
+}
+
+func TestExportMetricsWithStdoutExporter(t *testing.T) {
+	cfg := createDefaultConfig().(*Config)
+	cfg.Path = "testdata/stdout/main.wasm"
+	ctx := t.Context()
+	ctx, wasmExp, err := newWasmExporter(ctx, cfg)
+	if err != nil {
+		t.Fatalf("failed to create wasm exporter: %v", err)
+	}
+
+	// Create test metrics with 1 resource, 1 scope, and 1 metric
+	metrics := pmetric.NewMetrics()
+	rm := metrics.ResourceMetrics().AppendEmpty()
+	rm.Resource().Attributes().PutStr("service.name", "test-service")
+	ilm := rm.ScopeMetrics().AppendEmpty()
+	ilm.Scope().SetName("test-scope")
+	metric := ilm.Metrics().AppendEmpty()
+	metric.SetName("test-metric")
+	metric.SetEmptyGauge().DataPoints().AppendEmpty().SetIntValue(42)
+
+	// Push the metrics
+	err = wasmExp.pushMetrics(ctx, metrics)
+	if err != nil {
+		t.Fatalf("failed to push metrics: %v", err)
+	}
+}
+
+func TestExportLogsWithStdoutExporter(t *testing.T) {
+	cfg := createDefaultConfig().(*Config)
+	cfg.Path = "testdata/stdout/main.wasm"
+	ctx := t.Context()
+	ctx, wasmExp, err := newWasmExporter(ctx, cfg)
+	if err != nil {
+		t.Fatalf("failed to create wasm exporter: %v", err)
+	}
+
+	// Create test logs with 1 resource, 1 scope, and 1 log record
+	logs := plog.NewLogs()
+	rl := logs.ResourceLogs().AppendEmpty()
+	rl.Resource().Attributes().PutStr("service.name", "test-service")
+	sl := rl.ScopeLogs().AppendEmpty()
+	sl.Scope().SetName("test-scope")
+	logRecord := sl.LogRecords().AppendEmpty()
+	logRecord.SetSeverityText("INFO")
+	logRecord.Body().SetStr("test message")
+
+	// Push the logs
+	err = wasmExp.pushLogs(ctx, logs)
+	if err != nil {
+		t.Fatalf("failed to push logs: %v", err)
+	}
+}
+
 func TestConfigValidate(t *testing.T) {
 	// Test that the config validation works as expected
 	cfg := &Config{}
