@@ -25,3 +25,21 @@ type LogsProcessor interface {
 
 	ProcessLogs(logs plog.Logs) (plog.Logs, *Status)
 }
+
+type TracesExporter interface {
+	Plugin
+
+	PushTraces(traces ptrace.Traces) *Status
+}
+
+type MetricsExporter interface {
+	Plugin
+
+	PushMetrics(metrics pmetric.Metrics) *Status
+}
+
+type LogsExporter interface {
+	Plugin
+
+	PushLogs(logs plog.Logs) *Status
+}
