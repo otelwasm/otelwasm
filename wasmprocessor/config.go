@@ -1,18 +1,11 @@
 package wasmprocessor
 
-import "fmt"
+import "github.com/musaprg/otelwasm/wasmplugin"
 
 type Config struct {
-	Path string `mapstructure:"path"`
-
-	PluginConfig PluginConfig `mapstructure:"plugin_config"`
+	wasmplugin.Config `mapstructure:",squash"`
 }
 
 func (cfg *Config) Validate() error {
-	if cfg.Path == "" {
-		return fmt.Errorf("path is required")
-	}
-	return nil
+	return cfg.Config.Validate()
 }
-
-type PluginConfig map[string]any

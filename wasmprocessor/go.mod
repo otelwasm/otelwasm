@@ -3,7 +3,7 @@ module github.com/musaprg/otelwasm/wasmprocessor
 go 1.24.0
 
 require (
-	github.com/stealthrocket/wasi-go v0.8.0
+	github.com/musaprg/otelwasm/wasmplugin v0.0.0-00010101000000-000000000000
 	github.com/tetratelabs/wazero v1.9.0
 	go.opentelemetry.io/collector/component v1.29.0
 	go.opentelemetry.io/collector/component/componenttest v0.123.0
@@ -26,6 +26,7 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
+	github.com/stealthrocket/wasi-go v0.8.0 // indirect
 	github.com/stealthrocket/wazergo v0.19.1 // indirect
 	github.com/stretchr/testify v1.10.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
@@ -54,3 +55,5 @@ require (
 	google.golang.org/protobuf v1.36.6 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace github.com/musaprg/otelwasm/wasmplugin => ../wasmplugin
