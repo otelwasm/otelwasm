@@ -119,3 +119,7 @@ func SetResultLogs(logs plog.Logs) {
 	setResultLogs(ptr, size)
 	runtime.KeepAlive(rawMsg) // until ptr is no longer needed
 }
+
+func GetShutdownRequested() bool {
+	return getShutdownRequested() != 0
+}

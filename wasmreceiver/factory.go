@@ -1,0 +1,43 @@
+package wasmreceiver
+
+import (
+	"context"
+
+	"go.opentelemetry.io/collector/component"
+	"go.opentelemetry.io/collector/consumer"
+	"go.opentelemetry.io/collector/receiver"
+)
+
+var (
+	typeStr                               = component.MustNewType("wasm")
+	receiverCapabilities                  = consumer.Capabilities{MutatesData: true}
+	_                    component.Config = (*Config)(nil)
+)
+
+func createDefaultConfig() component.Config {
+	return &Config{}
+}
+
+// NewFactory creates a factory for wasmreceiver.
+func NewFactory() receiver.Factory {
+	return receiver.NewFactory(
+		typeStr,
+		createDefaultConfig,
+		// receiver.WithTraces(createTraces, component.StabilityLevelAlpha),
+		receiver.WithMetrics(createMetrics, component.StabilityLevelAlpha),
+		// receiver.WithLogs(createLogs, component.StabilityLevelAlpha),
+	)
+}
+
+func createMetrics(
+	ctx context.Context,
+	set receiver.Settings,
+	cfg component.Config,
+	nextConsumer consumer.Metrics,
+) (receiver.Metrics, error) {
+	_, wasmreceiver, err := newWasmReceiver(ctx, cfg.(*Config), nextConsumer)
+	if err != nil {
+		return nil, err
+	}
+	return wasmreceiver, nil
+}

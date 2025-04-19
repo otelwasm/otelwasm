@@ -19,3 +19,5 @@ func setResultMetrics(ptr, size uint32) { return }
 func setResultLogs(ptr, size uint32) { return }
 
 func setResultStatusReason(ptr, size uint32) { return }
+
+func getShutdownRequested() uint32 { return 0 }
