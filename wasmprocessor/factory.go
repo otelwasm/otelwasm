@@ -36,7 +36,7 @@ func createTraces(
 	cfg component.Config,
 	nextConsumer consumer.Traces,
 ) (processor.Traces, error) {
-	ctx, wasmProcessor, err := newWasmProcessor(ctx, cfg.(*Config))
+	wasmProcessor, err := newWasmProcessor(ctx, cfg.(*Config))
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +53,7 @@ func createMetrics(
 	cfg component.Config,
 	nextConsumer consumer.Metrics,
 ) (processor.Metrics, error) {
-	ctx, wasmProcessor, err := newWasmProcessor(ctx, cfg.(*Config))
+	wasmProcessor, err := newWasmProcessor(ctx, cfg.(*Config))
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +70,7 @@ func createLogs(
 	cfg component.Config,
 	nextConsumer consumer.Logs,
 ) (processor.Logs, error) {
-	ctx, wasmProcessor, err := newWasmProcessor(ctx, cfg.(*Config))
+	wasmProcessor, err := newWasmProcessor(ctx, cfg.(*Config))
 	if err != nil {
 		return nil, err
 	}

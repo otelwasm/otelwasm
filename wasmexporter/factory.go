@@ -35,7 +35,7 @@ func createTraces(
 	set exporter.Settings,
 	cfg component.Config,
 ) (exporter.Traces, error) {
-	ctx, wasmExporter, err := newWasmExporter(ctx, cfg.(*Config))
+	wasmExporter, err := newWasmExporter(ctx, cfg.(*Config))
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +51,7 @@ func createMetrics(
 	set exporter.Settings,
 	cfg component.Config,
 ) (exporter.Metrics, error) {
-	ctx, wasmExporter, err := newWasmExporter(ctx, cfg.(*Config))
+	wasmExporter, err := newWasmExporter(ctx, cfg.(*Config))
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +67,7 @@ func createLogs(
 	set exporter.Settings,
 	cfg component.Config,
 ) (exporter.Logs, error) {
-	ctx, wasmExporter, err := newWasmExporter(ctx, cfg.(*Config))
+	wasmExporter, err := newWasmExporter(ctx, cfg.(*Config))
 	if err != nil {
 		return nil, err
 	}

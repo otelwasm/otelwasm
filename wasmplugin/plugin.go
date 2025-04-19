@@ -10,6 +10,8 @@ import (
 
 	"github.com/stealthrocket/wasi-go"
 	wasigo "github.com/stealthrocket/wasi-go/imports"
+	"github.com/stealthrocket/wasi-go/imports/wasi_snapshot_preview1"
+	"github.com/stealthrocket/wazergo"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	"go.opentelemetry.io/collector/pdata/plog"
@@ -91,6 +93,12 @@ type WasmPlugin struct {
 
 	// Exported functions from the WASM module
 	ExportedFunctions map[string]api.Function
+
+	// wasiP1HostModule is the host module instance initialized by wasi-go.
+	// This instance holds necessary states for WASI host functions, which needs to be passed to context when calling the guest.
+	// This is a workaround to avoid panic when calling wasi functions with different context than the one used to instantiate the host module.
+	// TODO: Remove this if possible after replacing WASI implementation with our own.
+	wasiP1HostModule *wasi_snapshot_preview1.Module
 }
 
 // stackKey is the key used to store the stack in the context
@@ -116,25 +124,25 @@ func paramsFromContext(ctx context.Context) *Stack {
 }
 
 // NewWasmPlugin creates a new WasmPlugin instance
-func NewWasmPlugin(ctx context.Context, cfg *Config, requiredFunctions []string) (context.Context, *WasmPlugin, error) {
+func NewWasmPlugin(ctx context.Context, cfg *Config, requiredFunctions []string) (*WasmPlugin, error) {
 	if err := cfg.Validate(); err != nil {
-		return ctx, nil, err
+		return nil, err
 	}
 
 	f, err := os.Open(cfg.Path)
 	if err != nil {
-		return ctx, nil, err
+		return nil, err
 	}
 	defer f.Close()
 
 	bytes, err := io.ReadAll(f)
 	if err != nil {
-		return ctx, nil, err
+		return nil, err
 	}
 
 	runtime, guest, err := prepareRuntime(ctx, bytes)
 	if err != nil {
-		return ctx, nil, err
+		return nil, err
 	}
 
 	// Instantiate WASI module (wasi_snapshot_preview1 and wasmedge socket extension)
@@ -143,11 +151,18 @@ func NewWasmPlugin(ctx context.Context, cfg *Config, requiredFunctions []string)
 		WithSocketsExtension(wasmEdgeV2Extension, guest).
 		Instantiate(ctx, runtime)
 	if err != nil {
-		return ctx, nil, fmt.Errorf("wasm: error instantiating wasi module: %w", err)
+		return nil, fmt.Errorf("wasm: error instantiating wasi module: %w", err)
+	}
+
+	// Extract the wasi host module instance from the context as a workaround
+	// to avoid panic when calling wasi functions with different context than the one used to instantiate the host module.
+	wasiP1HostModule, ok := moduleInstanceFor[*wasi_snapshot_preview1.Module](ctx)
+	if !ok {
+		return nil, fmt.Errorf("wasm: error retrieving wasi host module instance")
 	}
 
 	if _, err := instantiateHostModule(ctx, runtime); err != nil {
-		return ctx, nil, fmt.Errorf("wasm: error instantiating host module: %w", err)
+		return nil, fmt.Errorf("wasm: error instantiating host module: %w", err)
 	}
 
 	config := wazero.NewModuleConfig().
@@ -157,7 +172,7 @@ func NewWasmPlugin(ctx context.Context, cfg *Config, requiredFunctions []string)
 
 	mod, err := runtime.InstantiateModule(ctx, guest, config)
 	if err != nil {
-		return ctx, nil, fmt.Errorf("wasm: error instantiating guest: %w", err)
+		return nil, fmt.Errorf("wasm: error instantiating guest: %w", err)
 	}
 
 	// Check if all required functions are exported
@@ -165,7 +180,7 @@ func NewWasmPlugin(ctx context.Context, cfg *Config, requiredFunctions []string)
 	for _, funcName := range requiredFunctions {
 		fn := mod.ExportedFunction(funcName)
 		if fn == nil {
-			return ctx, nil, fmt.Errorf("wasm: guest doesn't export required function: %s", funcName)
+			return nil, fmt.Errorf("wasm: guest doesn't export required function: %s", funcName)
 		}
 		exportedFunctions[funcName] = fn
 	}
@@ -173,7 +188,7 @@ func NewWasmPlugin(ctx context.Context, cfg *Config, requiredFunctions []string)
 	// Convert the plugin config to JSON representation
 	pluginConfigJSON, err := json.Marshal(cfg.PluginConfig)
 	if err != nil {
-		return ctx, nil, fmt.Errorf("wasm: error marshalling plugin config: %w", err)
+		return nil, fmt.Errorf("wasm: error marshalling plugin config: %w", err)
 	}
 
 	plugin := &WasmPlugin{
@@ -182,9 +197,10 @@ func NewWasmPlugin(ctx context.Context, cfg *Config, requiredFunctions []string)
 		Module:            mod,
 		PluginConfigJSON:  pluginConfigJSON,
 		ExportedFunctions: exportedFunctions,
+		wasiP1HostModule:  wasiP1HostModule,
 	}
 
-	return ctx, plugin, nil
+	return plugin, nil
 }
 
 // prepareRuntime initializes a new WebAssembly runtime
@@ -220,6 +236,8 @@ func createContextWithStack(ctx context.Context, stack *Stack) context.Context {
 // ProcessFunctionCall executes a WASM function and handles stack management
 func (p *WasmPlugin) ProcessFunctionCall(ctx context.Context, functionName string, stack *Stack) ([]uint64, error) {
 	ctx = createContextWithStack(ctx, stack)
+	// Set the WASI host module instance in the context
+	ctx = withModuleInstance(ctx, p.wasiP1HostModule)
 
 	fn, ok := p.ExportedFunctions[functionName]
 	if !ok {
@@ -382,4 +400,26 @@ func instantiateHostModule(ctx context.Context, runtime wazero.Runtime) (api.Mod
 		WithGoModuleFunction(api.GoModuleFunc(setResultStatusReasonFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{}).
 		WithParameterNames("buf", "buf_len").Export(setResultStatusReason).
 		Instantiate(ctx)
+}
+
+// moduleInstanceFor returns the module instance from the context that contains the internal
+// state required for WASI host functions.
+// NOTE: wasi-go returns context containing internal state when initializing the host module,
+// and the same context is required when calling wasi functions exposed by wasi-go.
+// This is a kind of workaround to avoid panic when calling
+// wasi functions with different context than the one used to instantiate the host module.
+func moduleInstanceFor[T wazergo.Module](ctx context.Context) (res T, ok bool) {
+	res, ok = ctx.Value((*wazergo.ModuleInstance[T])(nil)).(T)
+	return
+}
+
+// withModuleInstance returns a Go context inheriting from ctx and containing the
+// state needed for module instantiated from wazero host module to properly bind
+// their methods to their receiver (e.g. the module instance).
+// NOTE: wasi-go returns context containing internal state when initializing the
+// host module, and the same context is required when calling wasi functions
+// exposed by wasi-go. This is a kind of workaround to avoid panic when calling
+// wasi functions with different context than the one used to instantiate the host module.
+func withModuleInstance[T wazergo.Module](ctx context.Context, instance T) context.Context {
+	return context.WithValue(ctx, (*wazergo.ModuleInstance[T])(nil), instance)
 }
