@@ -22,12 +22,15 @@ type NopReceiver struct{}
 
 // StartTraces implements api.TracesReceiver.
 func (n *NopReceiver) StartTraces(ctx context.Context) {
+	<-ctx.Done()
 }
 
 // StartMetrics implements api.MetricsReceiver.
 func (n *NopReceiver) StartMetrics(ctx context.Context) {
+	<-ctx.Done()
 }
 
 // StartLogs implements api.LogsReceiver.
-func (n *NopReceiver) StartLogs() {
+func (n *NopReceiver) StartLogs(ctx context.Context) {
+	<-ctx.Done()
 }

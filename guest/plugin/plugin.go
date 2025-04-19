@@ -6,6 +6,7 @@ import (
 	"github.com/musaprg/otelwasm/guest/logsprocessor"
 	"github.com/musaprg/otelwasm/guest/metricsexporter"
 	"github.com/musaprg/otelwasm/guest/metricsprocessor"
+	"github.com/musaprg/otelwasm/guest/metricsreceiver"
 	"github.com/musaprg/otelwasm/guest/tracesexporter"
 	"github.com/musaprg/otelwasm/guest/tracesprocessor"
 )
@@ -29,4 +30,9 @@ func Set(plugin api.Plugin) {
 	if plugin, ok := plugin.(api.LogsExporter); ok {
 		logsexporter.SetPlugin(plugin)
 	}
+	if plugin, ok := plugin.(api.MetricsReceiver); ok {
+		metricsreceiver.SetPlugin(plugin)
+	}
+
+	// TODO: panic of return error
 }

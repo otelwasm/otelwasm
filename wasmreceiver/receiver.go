@@ -77,6 +77,8 @@ func (r *Receiver) Start(ctx context.Context, host component.Host) error {
 }
 
 func (r *Receiver) runMetrics(ctx context.Context) error {
+	defer r.wg.Done()
+
 	_, err := r.plugin.ProcessFunctionCall(ctx, "startMetricsReceiver", r.stack)
 	if err != nil {
 		return err
