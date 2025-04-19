@@ -14,9 +14,9 @@ type wasmProcessor struct {
 	plugin *wasmplugin.WasmPlugin
 }
 
-func newWasmProcessor(ctx context.Context, cfg *Config) (context.Context, *wasmProcessor, error) {
+func newWasmProcessor(ctx context.Context, cfg *Config) (*wasmProcessor, error) {
 	if err := cfg.Validate(); err != nil {
-		return ctx, nil, err
+		return nil, err
 	}
 
 	// Specify required functions for the processor
@@ -29,12 +29,12 @@ func newWasmProcessor(ctx context.Context, cfg *Config) (context.Context, *wasmP
 	}
 
 	// Initialize the WASM plugin
-	ctx, plugin, err := wasmplugin.NewWasmPlugin(ctx, pluginCfg, requiredFunctions)
+	plugin, err := wasmplugin.NewWasmPlugin(ctx, pluginCfg, requiredFunctions)
 	if err != nil {
-		return ctx, nil, err
+		return nil, err
 	}
 
-	return ctx, &wasmProcessor{
+	return &wasmProcessor{
 		plugin: plugin,
 	}, nil
 }

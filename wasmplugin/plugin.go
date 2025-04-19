@@ -116,25 +116,25 @@ func paramsFromContext(ctx context.Context) *Stack {
 }
 
 // NewWasmPlugin creates a new WasmPlugin instance
-func NewWasmPlugin(ctx context.Context, cfg *Config, requiredFunctions []string) (context.Context, *WasmPlugin, error) {
+func NewWasmPlugin(ctx context.Context, cfg *Config, requiredFunctions []string) (*WasmPlugin, error) {
 	if err := cfg.Validate(); err != nil {
-		return ctx, nil, err
+		return nil, err
 	}
 
 	f, err := os.Open(cfg.Path)
 	if err != nil {
-		return ctx, nil, err
+		return nil, err
 	}
 	defer f.Close()
 
 	bytes, err := io.ReadAll(f)
 	if err != nil {
-		return ctx, nil, err
+		return nil, err
 	}
 
 	runtime, guest, err := prepareRuntime(ctx, bytes)
 	if err != nil {
-		return ctx, nil, err
+		return nil, err
 	}
 
 	// Instantiate WASI module (wasi_snapshot_preview1 and wasmedge socket extension)
@@ -143,11 +143,11 @@ func NewWasmPlugin(ctx context.Context, cfg *Config, requiredFunctions []string)
 		WithSocketsExtension(wasmEdgeV2Extension, guest).
 		Instantiate(ctx, runtime)
 	if err != nil {
-		return ctx, nil, fmt.Errorf("wasm: error instantiating wasi module: %w", err)
+		return nil, fmt.Errorf("wasm: error instantiating wasi module: %w", err)
 	}
 
 	if _, err := instantiateHostModule(ctx, runtime); err != nil {
-		return ctx, nil, fmt.Errorf("wasm: error instantiating host module: %w", err)
+		return nil, fmt.Errorf("wasm: error instantiating host module: %w", err)
 	}
 
 	config := wazero.NewModuleConfig().
@@ -157,7 +157,7 @@ func NewWasmPlugin(ctx context.Context, cfg *Config, requiredFunctions []string)
 
 	mod, err := runtime.InstantiateModule(ctx, guest, config)
 	if err != nil {
-		return ctx, nil, fmt.Errorf("wasm: error instantiating guest: %w", err)
+		return nil, fmt.Errorf("wasm: error instantiating guest: %w", err)
 	}
 
 	// Check if all required functions are exported
@@ -165,7 +165,7 @@ func NewWasmPlugin(ctx context.Context, cfg *Config, requiredFunctions []string)
 	for _, funcName := range requiredFunctions {
 		fn := mod.ExportedFunction(funcName)
 		if fn == nil {
-			return ctx, nil, fmt.Errorf("wasm: guest doesn't export required function: %s", funcName)
+			return nil, fmt.Errorf("wasm: guest doesn't export required function: %s", funcName)
 		}
 		exportedFunctions[funcName] = fn
 	}
@@ -173,7 +173,7 @@ func NewWasmPlugin(ctx context.Context, cfg *Config, requiredFunctions []string)
 	// Convert the plugin config to JSON representation
 	pluginConfigJSON, err := json.Marshal(cfg.PluginConfig)
 	if err != nil {
-		return ctx, nil, fmt.Errorf("wasm: error marshalling plugin config: %w", err)
+		return nil, fmt.Errorf("wasm: error marshalling plugin config: %w", err)
 	}
 
 	plugin := &WasmPlugin{
@@ -184,7 +184,7 @@ func NewWasmPlugin(ctx context.Context, cfg *Config, requiredFunctions []string)
 		ExportedFunctions: exportedFunctions,
 	}
 
-	return ctx, plugin, nil
+	return plugin, nil
 }
 
 // prepareRuntime initializes a new WebAssembly runtime

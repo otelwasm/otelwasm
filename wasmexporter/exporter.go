@@ -14,9 +14,9 @@ type wasmExporter struct {
 	plugin *wasmplugin.WasmPlugin
 }
 
-func newWasmExporter(ctx context.Context, cfg *Config) (context.Context, *wasmExporter, error) {
+func newWasmExporter(ctx context.Context, cfg *Config) (*wasmExporter, error) {
 	if err := cfg.Validate(); err != nil {
-		return ctx, nil, err
+		return nil, err
 	}
 
 	// Specify required functions for the exporter
@@ -29,12 +29,12 @@ func newWasmExporter(ctx context.Context, cfg *Config) (context.Context, *wasmEx
 	}
 
 	// Initialize the WASM plugin
-	ctx, plugin, err := wasmplugin.NewWasmPlugin(ctx, pluginCfg, requiredFunctions)
+	plugin, err := wasmplugin.NewWasmPlugin(ctx, pluginCfg, requiredFunctions)
 	if err != nil {
-		return ctx, nil, err
+		return nil, err
 	}
 
-	return ctx, &wasmExporter{
+	return &wasmExporter{
 		plugin: plugin,
 	}, nil
 }
