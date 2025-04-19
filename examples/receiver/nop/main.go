@@ -13,7 +13,7 @@ func init() {
 func main() {}
 
 var (
-	// _ api.TracesReceiver  = (*NopReceiver)(nil)
+	_ api.TracesReceiver  = (*NopReceiver)(nil)
 	_ api.MetricsReceiver = (*NopReceiver)(nil)
 	_ api.LogsReceiver    = (*NopReceiver)(nil)
 )

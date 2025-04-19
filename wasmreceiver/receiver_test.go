@@ -49,3 +49,25 @@ func TestProcessLogsWithNopProcessor(t *testing.T) {
 		t.Fatalf("failed to stop wasm receiver: %v", err)
 	}
 }
+
+func TestProcessTracesWithNopProcessor(t *testing.T) {
+	cfg := createDefaultConfig().(*Config)
+	cfg.Path = "testdata/nop/main.wasm"
+	ctx := t.Context()
+	ctx, wasmProc, err := newTracesWasmReceiver(ctx, cfg, consumertest.NewNop())
+	if err != nil {
+		t.Fatalf("failed to create wasm receiver: %v", err)
+	}
+
+	// Start the metrics receiver
+	err = wasmProc.Start(ctx, nil)
+	if err != nil {
+		t.Fatalf("failed to start wasm receiver: %v", err)
+	}
+
+	// Stop the metrics receiver
+	err = wasmProc.Shutdown(ctx)
+	if err != nil {
+		t.Fatalf("failed to stop wasm receiver: %v", err)
+	}
+}

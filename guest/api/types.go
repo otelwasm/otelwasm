@@ -10,11 +10,15 @@ import (
 
 type Plugin interface{}
 
-// LogsReceiver is the interface for implementing a logs receiver
+type TracesReceiver interface {
+	Plugin
+
+	StartTraces(ctx context.Context)
+}
+
 type LogsReceiver interface {
 	Plugin
 
-	// StartLogs with context for long-running receivers
 	StartLogs(ctx context.Context)
 }
 

@@ -119,6 +119,7 @@ type Stack struct {
 
 	OnResultMetricsChange func(pmetric.Metrics)
 	OnResultLogsChange    func(plog.Logs)
+	OnResultTracesChange  func(ptrace.Traces)
 
 	// PluginConfigJSON is the plugin config in JSON representation passed to the guest
 	PluginConfigJSON []byte
@@ -329,6 +330,10 @@ func setResultTracesFn(ctx context.Context, mod api.Module, stack []uint64) {
 
 	// Store the result traces in context
 	paramsFromContext(ctx).ResultTraces = traces
+	onResultTracesChange := paramsFromContext(ctx).OnResultTracesChange
+	if onResultTracesChange != nil {
+		onResultTracesChange(traces)
+	}
 }
 
 func setResultMetricsFn(ctx context.Context, mod api.Module, stack []uint64) {

@@ -9,6 +9,7 @@ import (
 	"go.opentelemetry.io/collector/consumer"
 	"go.opentelemetry.io/collector/pdata/plog"
 	"go.opentelemetry.io/collector/pdata/pmetric"
+	"go.opentelemetry.io/collector/pdata/ptrace"
 	"go.opentelemetry.io/collector/receiver"
 )
 
@@ -17,6 +18,7 @@ type Receiver struct {
 	plugin        *wasmplugin.WasmPlugin
 	nextConsumerM consumer.Metrics
 	nextConsumerL consumer.Logs
+	nextConsumerT consumer.Traces
 
 	stack *wasmplugin.Stack
 	wg    sync.WaitGroup
@@ -70,8 +72,33 @@ func newLogsWasmReceiver(ctx context.Context, cfg *Config, nextConsumerL consume
 	}, nil
 }
 
+func newTracesWasmReceiver(ctx context.Context, cfg *Config, nextConsumerT consumer.Traces) (context.Context, *Receiver, error) {
+	if err := cfg.Validate(); err != nil {
+		return ctx, nil, err
+	}
+
+	requiredFunctions := []string{"startTracesReceiver"}
+
+	pluginCfg := &wasmplugin.Config{
+		Path:         cfg.Path,
+		PluginConfig: cfg.PluginConfig,
+	}
+
+	ctx, plugin, err := wasmplugin.NewWasmPlugin(ctx, pluginCfg, requiredFunctions)
+	if err != nil {
+		return ctx, nil, err
+	}
+
+	return ctx, &Receiver{
+		cfg:           cfg,
+		plugin:        plugin,
+		nextConsumerT: nextConsumerT,
+	}, nil
+}
+
 var _ receiver.Metrics = (*Receiver)(nil)
 var _ receiver.Logs = (*Receiver)(nil)
+var _ receiver.Traces = (*Receiver)(nil)
 
 // Start tells the component to start. Host parameter can be used for communicating
 // with the host after Start() has already returned. If an error is returned by
@@ -97,9 +124,16 @@ func (r *Receiver) Start(ctx context.Context, host component.Host) error {
 		}
 	}
 
+	onResultTracesChange := func(resultTraces ptrace.Traces) {
+		if r.nextConsumerT != nil {
+			r.nextConsumerT.ConsumeTraces(ctx, resultTraces)
+		}
+	}
+
 	r.stack = &wasmplugin.Stack{
 		OnResultMetricsChange: onResultMetricsChange,
 		OnResultLogsChange:    onResultLogsChange,
+		OnResultTracesChange:  onResultTracesChange,
 		PluginConfigJSON:      r.plugin.PluginConfigJSON,
 	}
 
@@ -111,6 +145,11 @@ func (r *Receiver) Start(ctx context.Context, host component.Host) error {
 	if r.nextConsumerL != nil {
 		r.wg.Add(1)
 		go r.runLogs(ctx)
+	}
+
+	if r.nextConsumerT != nil {
+		r.wg.Add(1)
+		go r.runTraces(ctx)
 	}
 
 	return nil
@@ -131,6 +170,17 @@ func (r *Receiver) runLogs(ctx context.Context) error {
 	defer r.wg.Done()
 
 	_, err := r.plugin.ProcessFunctionCall(ctx, "startLogsReceiver", r.stack)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *Receiver) runTraces(ctx context.Context) error {
+	defer r.wg.Done()
+
+	_, err := r.plugin.ProcessFunctionCall(ctx, "startTracesReceiver", r.stack)
 	if err != nil {
 		return err
 	}
