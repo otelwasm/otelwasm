@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/musaprg/otelwasm/guest/api"
-	"github.com/musaprg/otelwasm/guest/plugin" // register tracesreceiver
+	"github.com/musaprg/otelwasm/guest/plugin" // register receivers
 )
 
 func init() {
@@ -15,7 +15,7 @@ func main() {}
 var (
 	// _ api.TracesReceiver  = (*NopReceiver)(nil)
 	_ api.MetricsReceiver = (*NopReceiver)(nil)
-	// _ api.LogsReceiver    = (*NopReceiver)(nil)
+	_ api.LogsReceiver    = (*NopReceiver)(nil)
 )
 
 type NopReceiver struct{}

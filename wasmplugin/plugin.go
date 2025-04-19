@@ -118,6 +118,7 @@ type Stack struct {
 	RequestedShutdown atomic.Bool
 
 	OnResultMetricsChange func(pmetric.Metrics)
+	OnResultLogsChange    func(plog.Logs)
 
 	// PluginConfigJSON is the plugin config in JSON representation passed to the guest
 	PluginConfigJSON []byte
@@ -376,6 +377,10 @@ func setResultLogsFn(ctx context.Context, mod api.Module, stack []uint64) {
 
 	// Store the result logs in context
 	paramsFromContext(ctx).ResultLogs = logs
+	onResultLogsChange := paramsFromContext(ctx).OnResultLogsChange
+	if onResultLogsChange != nil {
+		onResultLogsChange(logs)
+	}
 }
 
 func setResultStatusReasonFn(ctx context.Context, mod api.Module, stack []uint64) {
