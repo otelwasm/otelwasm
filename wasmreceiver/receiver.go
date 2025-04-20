@@ -2,6 +2,7 @@ package wasmreceiver
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/musaprg/otelwasm/wasmplugin"
@@ -49,6 +50,7 @@ func newMetricsWasmReceiver(ctx context.Context, cfg *Config, nextConsumerM cons
 }
 
 func newLogsWasmReceiver(ctx context.Context, cfg *Config, nextConsumerL consumer.Logs) (context.Context, *Receiver, error) {
+	fmt.Println("newLogsWasmReceiver called")
 	if err := cfg.Validate(); err != nil {
 		return ctx, nil, err
 	}
@@ -112,6 +114,7 @@ var _ receiver.Traces = (*Receiver)(nil)
 // to Start() function since that context will be cancelled soon and can abort the long-running
 // operation. Create a new context from the context.Background() for long-running operations.
 func (r *Receiver) Start(ctx context.Context, host component.Host) error {
+	fmt.Println("Start called")
 	onResultMetricsChange := func(resultMetrics pmetric.Metrics) {
 		if r.nextConsumerM != nil {
 			r.nextConsumerM.ConsumeMetrics(ctx, resultMetrics)
@@ -156,6 +159,7 @@ func (r *Receiver) Start(ctx context.Context, host component.Host) error {
 }
 
 func (r *Receiver) runMetrics(ctx context.Context) error {
+	fmt.Println("runMetrics called")
 	defer r.wg.Done()
 
 	_, err := r.plugin.ProcessFunctionCall(ctx, "startMetricsReceiver", r.stack)
@@ -167,6 +171,7 @@ func (r *Receiver) runMetrics(ctx context.Context) error {
 }
 
 func (r *Receiver) runLogs(ctx context.Context) error {
+	fmt.Println("runLogs called")
 	defer r.wg.Done()
 
 	_, err := r.plugin.ProcessFunctionCall(ctx, "startLogsReceiver", r.stack)
@@ -178,6 +183,7 @@ func (r *Receiver) runLogs(ctx context.Context) error {
 }
 
 func (r *Receiver) runTraces(ctx context.Context) error {
+	fmt.Println("runTraces called")
 	defer r.wg.Done()
 
 	_, err := r.plugin.ProcessFunctionCall(ctx, "startTracesReceiver", r.stack)

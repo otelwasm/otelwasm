@@ -23,6 +23,7 @@ var _ func() = _startLogsReceiver
 
 //go:wasmexport startLogsReceiver
 func _startLogsReceiver() {
+	println("startLogsReceiver called")
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go func() {

@@ -13,6 +13,7 @@ import (
 )
 
 func init() {
+	println("registering webhookeventreceiver")
 	plugin.Set(&WebhookEventReceiver{})
 }
 func main() {}
@@ -58,4 +59,6 @@ func (n *WebhookEventReceiver) StartLogs(ctx context.Context) {
 	println("initialization completed")
 
 	lr.Start(ctx, &host{})
+	<-ctx.Done()
+	println("stopping receiver")
 }
