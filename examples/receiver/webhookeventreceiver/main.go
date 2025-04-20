@@ -49,7 +49,7 @@ func (n *WebhookEventReceiver) StartLogs(ctx context.Context) {
 	println("called startlogs")
 
 	cfg := webhookeventreceiver.CreateDefaultConfig().(*webhookeventreceiver.Config)
-	cfg.Endpoint = "localhost:8088"
+	cfg.Endpoint = "127.0.0.1:8088"
 	csm := &logConsumer{}
 	lr, err := webhookeventreceiver.NewLogsReceiver(*cfg, csm)
 	if err != nil {
@@ -58,7 +58,9 @@ func (n *WebhookEventReceiver) StartLogs(ctx context.Context) {
 
 	println("initialization completed")
 
-	lr.Start(ctx, &host{})
+	if err := lr.Start(ctx, &host{}); err != nil {
+		panic(err)
+	}
 	<-ctx.Done()
 	println("stopping receiver")
 }
