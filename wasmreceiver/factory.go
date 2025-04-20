@@ -26,6 +26,7 @@ func NewFactory() receiver.Factory {
 		// receiver.WithTraces(createTraces, component.StabilityLevelAlpha),
 		receiver.WithMetrics(createMetrics, component.StabilityLevelAlpha),
 		receiver.WithLogs(createLogs, component.StabilityLevelAlpha),
+		receiver.WithTraces(createTraces, component.StabilityLevelAlpha),
 	)
 }
 
@@ -49,6 +50,19 @@ func createLogs(
 	nextConsumer consumer.Logs,
 ) (receiver.Logs, error) {
 	_, wasmreceiver, err := newLogsWasmReceiver(ctx, cfg.(*Config), nextConsumer)
+	if err != nil {
+		return nil, err
+	}
+	return wasmreceiver, nil
+}
+
+func createTraces(
+	ctx context.Context,
+	set receiver.Settings,
+	cfg component.Config,
+	nextConsumer consumer.Traces,
+) (receiver.Logs, error) {
+	_, wasmreceiver, err := newTracesWasmReceiver(ctx, cfg.(*Config), nextConsumer)
 	if err != nil {
 		return nil, err
 	}
