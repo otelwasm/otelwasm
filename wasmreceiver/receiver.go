@@ -11,6 +11,7 @@ import (
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	"go.opentelemetry.io/collector/receiver"
+	"go.uber.org/zap"
 )
 
 type Receiver struct {
@@ -19,12 +20,13 @@ type Receiver struct {
 	nextConsumerM consumer.Metrics
 	nextConsumerL consumer.Logs
 	nextConsumerT consumer.Traces
+	logger        *zap.Logger
 
 	stack *wasmplugin.Stack
 	wg    sync.WaitGroup
 }
 
-func newMetricsWasmReceiver(ctx context.Context, cfg *Config, nextConsumerM consumer.Metrics) (context.Context, *Receiver, error) {
+func newMetricsWasmReceiver(ctx context.Context, cfg *Config, nextConsumerM consumer.Metrics, logger *zap.Logger) (context.Context, *Receiver, error) {
 	if err := cfg.Validate(); err != nil {
 		return ctx, nil, err
 	}
@@ -45,10 +47,11 @@ func newMetricsWasmReceiver(ctx context.Context, cfg *Config, nextConsumerM cons
 		cfg:           cfg,
 		plugin:        plugin,
 		nextConsumerM: nextConsumerM,
+		logger:        logger,
 	}, nil
 }
 
-func newLogsWasmReceiver(ctx context.Context, cfg *Config, nextConsumerL consumer.Logs) (context.Context, *Receiver, error) {
+func newLogsWasmReceiver(ctx context.Context, cfg *Config, nextConsumerL consumer.Logs, logger *zap.Logger) (context.Context, *Receiver, error) {
 	if err := cfg.Validate(); err != nil {
 		return ctx, nil, err
 	}
@@ -69,10 +72,11 @@ func newLogsWasmReceiver(ctx context.Context, cfg *Config, nextConsumerL consume
 		cfg:           cfg,
 		plugin:        plugin,
 		nextConsumerL: nextConsumerL,
+		logger:        logger,
 	}, nil
 }
 
-func newTracesWasmReceiver(ctx context.Context, cfg *Config, nextConsumerT consumer.Traces) (context.Context, *Receiver, error) {
+func newTracesWasmReceiver(ctx context.Context, cfg *Config, nextConsumerT consumer.Traces, logger *zap.Logger) (context.Context, *Receiver, error) {
 	if err := cfg.Validate(); err != nil {
 		return ctx, nil, err
 	}
@@ -93,6 +97,7 @@ func newTracesWasmReceiver(ctx context.Context, cfg *Config, nextConsumerT consu
 		cfg:           cfg,
 		plugin:        plugin,
 		nextConsumerT: nextConsumerT,
+		logger:        logger,
 	}, nil
 }
 
@@ -155,37 +160,31 @@ func (r *Receiver) Start(ctx context.Context, host component.Host) error {
 	return nil
 }
 
-func (r *Receiver) runMetrics(ctx context.Context) error {
+func (r *Receiver) runMetrics(ctx context.Context) {
 	defer r.wg.Done()
 
 	_, err := r.plugin.ProcessFunctionCall(ctx, "startMetricsReceiver", r.stack)
 	if err != nil {
-		return err
+		r.logger.Fatal("metrics receiver failed", zap.Error(err))
 	}
-
-	return nil
 }
 
-func (r *Receiver) runLogs(ctx context.Context) error {
+func (r *Receiver) runLogs(ctx context.Context) {
 	defer r.wg.Done()
 
 	_, err := r.plugin.ProcessFunctionCall(ctx, "startLogsReceiver", r.stack)
 	if err != nil {
-		return err
+		r.logger.Fatal("metrics receiver failed", zap.Error(err))
 	}
-
-	return nil
 }
 
-func (r *Receiver) runTraces(ctx context.Context) error {
+func (r *Receiver) runTraces(ctx context.Context) {
 	defer r.wg.Done()
 
 	_, err := r.plugin.ProcessFunctionCall(ctx, "startTracesReceiver", r.stack)
 	if err != nil {
-		return err
+		r.logger.Fatal("metrics receiver failed", zap.Error(err))
 	}
-
-	return nil
 }
 
 // Shutdown is invoked during service shutdown. After Shutdown() is called, if the component

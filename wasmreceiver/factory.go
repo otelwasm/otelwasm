@@ -36,7 +36,7 @@ func createMetrics(
 	cfg component.Config,
 	nextConsumer consumer.Metrics,
 ) (receiver.Metrics, error) {
-	_, wasmreceiver, err := newMetricsWasmReceiver(ctx, cfg.(*Config), nextConsumer)
+	_, wasmreceiver, err := newMetricsWasmReceiver(ctx, cfg.(*Config), nextConsumer, set.Logger)
 	if err != nil {
 		return nil, err
 	}
@@ -49,7 +49,7 @@ func createLogs(
 	cfg component.Config,
 	nextConsumer consumer.Logs,
 ) (receiver.Logs, error) {
-	_, wasmreceiver, err := newLogsWasmReceiver(ctx, cfg.(*Config), nextConsumer)
+	_, wasmreceiver, err := newLogsWasmReceiver(ctx, cfg.(*Config), nextConsumer, set.Logger)
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +62,7 @@ func createTraces(
 	cfg component.Config,
 	nextConsumer consumer.Traces,
 ) (receiver.Logs, error) {
-	_, wasmreceiver, err := newTracesWasmReceiver(ctx, cfg.(*Config), nextConsumer)
+	_, wasmreceiver, err := newTracesWasmReceiver(ctx, cfg.(*Config), nextConsumer, set.Logger)
 	if err != nil {
 		return nil, err
 	}
