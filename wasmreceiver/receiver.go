@@ -176,8 +176,11 @@ func (r *Receiver) runLogs(ctx context.Context) error {
 
 	_, err := r.plugin.ProcessFunctionCall(ctx, "startLogsReceiver", r.stack)
 	if err != nil {
+		fmt.Println("Error in runLogs:", err)
 		return err
 	}
+
+	fmt.Println("runLogs completed")
 
 	return nil
 }
