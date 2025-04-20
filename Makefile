@@ -58,6 +58,7 @@ format:
 
 .PHONY: test
 test:
+	$(cd wasmreceiver; go test -v ./...)
 	@(cd wasmprocessor; go test -v ./...)
 	@(cd wasmexporter; go test -v ./...)
 	@(cd guest; go test -v ./...)
