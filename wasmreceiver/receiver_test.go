@@ -6,7 +6,7 @@ import (
 	"go.opentelemetry.io/collector/consumer/consumertest"
 )
 
-func TestProcessMetricsWithNopProcessor(t *testing.T) {
+func TestProcessMetricsWithNopReceiver(t *testing.T) {
 	cfg := createDefaultConfig().(*Config)
 	cfg.Path = "testdata/nop/main.wasm"
 	ctx := t.Context()
@@ -28,7 +28,7 @@ func TestProcessMetricsWithNopProcessor(t *testing.T) {
 	}
 }
 
-func TestProcessLogsWithNopProcessor(t *testing.T) {
+func TestProcessLogsWithNopReceiver(t *testing.T) {
 	cfg := createDefaultConfig().(*Config)
 	cfg.Path = "testdata/nop/main.wasm"
 	ctx := t.Context()
@@ -50,7 +50,7 @@ func TestProcessLogsWithNopProcessor(t *testing.T) {
 	}
 }
 
-func TestProcessTracesWithNopProcessor(t *testing.T) {
+func TestProcessTracesWithNopReceiver(t *testing.T) {
 	cfg := createDefaultConfig().(*Config)
 	cfg.Path = "testdata/nop/main.wasm"
 	ctx := t.Context()
