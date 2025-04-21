@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sync"
 
 	"github.com/golang/snappy"
 	"github.com/klauspost/compress/zstd"
@@ -136,6 +137,7 @@ type decompressor struct {
 // by identifying the compression format in the "Content-Encoding" header and re-writing
 // request body so that the handlers further in the chain can work on decompressed data.
 func httpContentDecompressor(h http.Handler, maxRequestBodySize int64, eh func(w http.ResponseWriter, r *http.Request, errorMsg string, statusCode int), enableDecoders []string, decoders map[string]func(body io.ReadCloser) (io.ReadCloser, error)) http.Handler {
+	var mu sync.Mutex
 	errHandler := defaultErrorHandler
 	if eh != nil {
 		errHandler = eh
@@ -143,6 +145,9 @@ func httpContentDecompressor(h http.Handler, maxRequestBodySize int64, eh func(w
 
 	enabled := map[string]func(body io.ReadCloser) (io.ReadCloser, error){}
 	for _, dec := range enableDecoders {
+		// Avoid concurrent map writes
+		mu.Lock()
+		defer mu.Unlock()
 		enabled[dec] = availableDecoders[dec]
 
 		if dec == "deflate" {
