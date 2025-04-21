@@ -427,11 +427,6 @@ type addrInfo struct {
 }
 
 func getaddrinfo(name, service string, hints *addrInfo, results []addrInfo) (int, error) {
-	println("name:", name)
-	println("service:", service)
-	println("hints:", hints)
-	println("results:", results)
-
 	hints.sockAddrInfo = sockAddrInfo{
 		ai_flags:    uint16(hints.flags),
 		ai_family:   uint8(hints.family),
@@ -459,10 +454,17 @@ func getaddrinfo(name, service string, hints *addrInfo, results []addrInfo) (int
 		}
 	}
 
+	println("name:", name)
+	println("service:", service)
+	println("hints:", hints)
+	println("results:", results)
+
 	resPtr := uintptr32(uintptr(unsafe.Pointer(&results[0].sockAddrInfo)))
 	// For compatibility with WasmEdge, make sure strings are null-terminated.
 	namePtr, nameLen := nullTerminatedString(name)
+	println("namePtr:", unsafe.Pointer(namePtr), "nameLen:", nameLen)
 	servPtr, servLen := nullTerminatedString(service)
+	println("servPtr:", unsafe.Pointer(servPtr), "servLen:", servLen)
 
 	var n uint32
 	println("sock_getaddrinfo", unsafe.Pointer(namePtr), uint32(nameLen), unsafe.Pointer(servPtr), uint32(servLen), unsafe.Pointer(&hints.sockAddrInfo), unsafe.Pointer(&resPtr), uint32(len(results)), unsafe.Pointer(&n))
@@ -506,11 +508,16 @@ func getaddrinfo(name, service string, hints *addrInfo, results []addrInfo) (int
 }
 
 func nullTerminatedString(s string) (*byte, int) {
-	if n := strings.IndexByte(s, 0); n >= 0 {
-		s = s[:n+1]
-		return unsafe.StringData(s), len(s)
-	} else {
-		b := append([]byte(s), 0)
-		return unsafe.SliceData(b), len(b)
+	if len(s) == 0 {
+		return nil, 0
 	}
+	if strings.IndexByte(s, 0) >= 0 {
+		// String already contains a null terminator
+		return (*byte)(unsafe.Pointer(unsafe.StringData(s))), len(s)
+	}
+	// Allocate a new buffer with space for the null terminator
+	buf := make([]byte, len(s)+1)
+	copy(buf, s)
+	// buf[len(s)] is already 0
+	return (*byte)(unsafe.Pointer(unsafe.SliceData(buf))), len(buf)
 }
