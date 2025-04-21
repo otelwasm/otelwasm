@@ -25,7 +25,7 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"golang.org/x/net/http2"
 
-	wasinet "github.com/stealthrocket/net/wasip1"
+	wasinet "github.com/musaprg/otelwasm/examples/receiver/webhookeventreceiver/wasip1"
 )
 
 var (
