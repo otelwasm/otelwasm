@@ -110,13 +110,6 @@ func (er *eventReceiver) Start(ctx context.Context, host component.Host) error {
 	}
 
 	var handler http.Handler = router
-	handler = httpContentDecompressor(
-		handler,
-		er.cfg.MaxRequestBodySize,
-		nil,
-		er.cfg.CompressionAlgorithms,
-		nil,
-	)
 
 	if er.cfg.MaxRequestBodySize > 0 {
 		handler = maxRequestBodySizeInterceptor(handler, er.cfg.MaxRequestBodySize)
