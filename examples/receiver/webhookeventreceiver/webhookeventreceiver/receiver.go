@@ -250,11 +250,7 @@ func (er *eventReceiver) handleReq(w http.ResponseWriter, r *http.Request, _ htt
 
 // Simple healthcheck endpoint.
 func (er *eventReceiver) handleHealthCheck(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
-	// w.Header().Add("Content-Type", "application/json")
-	// w.WriteHeader(http.StatusOK)
-	// _, _ = w.Write([]byte(healthyResponse))
-
-	// just return 200 at the moment because we got the following weird runtime error
+	// somehow adding MIME header failed because of the following weird runtime error
 	/*
 		fatal error: bulkBarrierPreWrite: unaligned arguments
 
@@ -591,7 +587,10 @@ func (er *eventReceiver) handleHealthCheck(w http.ResponseWriter, _ *http.Reques
 				.runtime.write1(i32) i32
 				... maybe followed by omitted frames
 	*/
+	// w.Header().Add("Content-Type", "application/json")
+
 	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(healthyResponse))
 }
 
 // write response on a failed/bad request. Generates a small json body based on the thrown by
