@@ -58,7 +58,6 @@ format:
 
 .PHONY: test
 test:
-	$(cd wasmreceiver; go test -v ./...)
 	@(cd wasmprocessor; go test -v ./...)
 	@(cd wasmexporter; go test -v ./...)
 	@(cd guest; go test -v ./...)
@@ -82,8 +81,12 @@ examples/exporter/stdout/main.wasm: examples/exporter/stdout/main.go
 examples/receiver/nop/main.wasm: examples/receiver/nop/main.go
 	@(cd $(@D); GOOS=wasip1 GOARCH=wasm go build -buildmode=c-shared -o main.wasm ./...)
 
+examples/receiver/webhookeventreceiver/main.wasm: examples/receiver/webhookeventreceiver/main.go
+	# getaddrinfo buildtag is necessary to use sock_getaddrinfo for name resolution
+	@(cd $(@D); GOOS=wasip1 GOARCH=wasm go build -buildmode=c-shared -tags="getaddrinfo" -o main.wasm main.go)
+
 .PHONY: build-wasm-examples
-build-wasm-examples: examples/processor/nop/main.wasm examples/processor/add_new_attribute/main.wasm examples/processor/curl/main.wasm examples/exporter/nop/main.wasm examples/exporter/stdout/main.wasm examples/receiver/nop/main.wasm
+build-wasm-examples: examples/processor/nop/main.wasm examples/processor/add_new_attribute/main.wasm examples/processor/curl/main.wasm examples/exporter/nop/main.wasm examples/exporter/stdout/main.wasm examples/receiver/nop/main.wasm examples/receiver/webhookeventreceiver/main.wasm
 
 .PHONY: copy-wasm-examples
 copy-wasm-examples: build-wasm-examples
