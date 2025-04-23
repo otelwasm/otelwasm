@@ -16,17 +16,17 @@ import (
 
 type Receiver struct {
 	cfg           *Config
+	set           receiver.Settings
 	plugin        *wasmplugin.WasmPlugin
 	nextConsumerM consumer.Metrics
 	nextConsumerL consumer.Logs
 	nextConsumerT consumer.Traces
-	logger        *zap.Logger
 
 	stack *wasmplugin.Stack
 	wg    sync.WaitGroup
 }
 
-func newMetricsWasmReceiver(ctx context.Context, cfg *Config, nextConsumerM consumer.Metrics, logger *zap.Logger) (context.Context, *Receiver, error) {
+func newMetricsWasmReceiver(ctx context.Context, cfg *Config, nextConsumerM consumer.Metrics, set receiver.Settings) (context.Context, *Receiver, error) {
 	if err := cfg.Validate(); err != nil {
 		return ctx, nil, err
 	}
@@ -47,11 +47,11 @@ func newMetricsWasmReceiver(ctx context.Context, cfg *Config, nextConsumerM cons
 		cfg:           cfg,
 		plugin:        plugin,
 		nextConsumerM: nextConsumerM,
-		logger:        logger,
+		set:           set,
 	}, nil
 }
 
-func newLogsWasmReceiver(ctx context.Context, cfg *Config, nextConsumerL consumer.Logs, logger *zap.Logger) (context.Context, *Receiver, error) {
+func newLogsWasmReceiver(ctx context.Context, cfg *Config, nextConsumerL consumer.Logs, set receiver.Settings) (context.Context, *Receiver, error) {
 	if err := cfg.Validate(); err != nil {
 		return ctx, nil, err
 	}
@@ -72,11 +72,11 @@ func newLogsWasmReceiver(ctx context.Context, cfg *Config, nextConsumerL consume
 		cfg:           cfg,
 		plugin:        plugin,
 		nextConsumerL: nextConsumerL,
-		logger:        logger,
+		set:           set,
 	}, nil
 }
 
-func newTracesWasmReceiver(ctx context.Context, cfg *Config, nextConsumerT consumer.Traces, logger *zap.Logger) (context.Context, *Receiver, error) {
+func newTracesWasmReceiver(ctx context.Context, cfg *Config, nextConsumerT consumer.Traces, set receiver.Settings) (context.Context, *Receiver, error) {
 	if err := cfg.Validate(); err != nil {
 		return ctx, nil, err
 	}
@@ -97,7 +97,7 @@ func newTracesWasmReceiver(ctx context.Context, cfg *Config, nextConsumerT consu
 		cfg:           cfg,
 		plugin:        plugin,
 		nextConsumerT: nextConsumerT,
-		logger:        logger,
+		set:           set,
 	}, nil
 }
 
@@ -165,7 +165,7 @@ func (r *Receiver) runMetrics(ctx context.Context) {
 
 	_, err := r.plugin.ProcessFunctionCall(ctx, "startMetricsReceiver", r.stack)
 	if err != nil {
-		r.logger.Fatal("metrics receiver failed", zap.Error(err))
+		r.set.Logger.Fatal("metrics receiver failed", zap.Error(err))
 	}
 }
 
@@ -174,7 +174,7 @@ func (r *Receiver) runLogs(ctx context.Context) {
 
 	_, err := r.plugin.ProcessFunctionCall(ctx, "startLogsReceiver", r.stack)
 	if err != nil {
-		r.logger.Fatal("metrics receiver failed", zap.Error(err))
+		r.set.Logger.Fatal("metrics receiver failed", zap.Error(err))
 	}
 }
 
@@ -183,7 +183,7 @@ func (r *Receiver) runTraces(ctx context.Context) {
 
 	_, err := r.plugin.ProcessFunctionCall(ctx, "startTracesReceiver", r.stack)
 	if err != nil {
-		r.logger.Fatal("metrics receiver failed", zap.Error(err))
+		r.set.Logger.Fatal("metrics receiver failed", zap.Error(err))
 	}
 }
 
