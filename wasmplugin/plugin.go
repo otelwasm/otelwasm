@@ -212,7 +212,8 @@ func NewWasmPlugin(ctx context.Context, cfg *Config, requiredFunctions []string)
 
 // prepareRuntime initializes a new WebAssembly runtime
 func prepareRuntime(ctx context.Context, guestBin []byte) (runtime wazero.Runtime, guest wazero.CompiledModule, err error) {
-	runtime = wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfig())
+	// TODO: Switch to compiler backend after fixing the memory allocator issue in wazero
+	runtime = wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfigInterpreter())
 
 	guest, err = compileGuest(ctx, runtime, guestBin)
 	if err != nil {
