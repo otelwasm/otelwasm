@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"time"
 
 	"github.com/musaprg/otelwasm/examples/receiver/webhookeventreceiver/webhookeventreceiver"
 	"github.com/musaprg/otelwasm/guest/api"
@@ -62,8 +61,6 @@ func (n *WebhookEventReceiver) StartLogs(ctx context.Context) {
 	if err := lr.Start(ctx, &host{}); err != nil {
 		panic(err)
 	}
-	time.Sleep(1 * time.Hour)
-	//the following code causes panic somehow, which might be due to massive call stack because of context switch
-	//<-ctx.Done()
+	<-ctx.Done()
 	println("stopping receiver")
 }

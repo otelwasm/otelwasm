@@ -9,7 +9,6 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"regexp"
@@ -596,9 +595,6 @@ func (er *eventReceiver) handleHealthCheck(w http.ResponseWriter, _ *http.Reques
 	// MIMEHeader(h).Add("Content-Type1", "application/json")
 	// MIMEHeader(h).Set("Content-Type2", "application/json")
 	w.Header().Add("Content-Type", "application/json")
-
-	// After inserting this line, the above panic will not happen, but the header will not be set
-	fmt.Println("Content-Type", w.Header().Get("Content-Type"))
 
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte(healthyResponse))

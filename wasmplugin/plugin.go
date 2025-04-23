@@ -212,7 +212,9 @@ func NewWasmPlugin(ctx context.Context, cfg *Config, requiredFunctions []string)
 
 // prepareRuntime initializes a new WebAssembly runtime
 func prepareRuntime(ctx context.Context, guestBin []byte) (runtime wazero.Runtime, guest wazero.CompiledModule, err error) {
-	runtime = wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfig().WithMemoryCapacityFromMax(true).WithDebugInfoEnabled(true))
+	// runtime = wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfig().WithMemoryCapacityFromMax(true).WithDebugInfoEnabled(true))
+	// It seems wazevo (or Compiler of wazero) has a bug when we work with context.Context or memory grow. We should check and investigate this, but we can avoid by just using Interpreter mode for now.
+	runtime = wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfigInterpreter().WithDebugInfoEnabled(true))
 
 	guest, err = compileGuest(ctx, runtime, guestBin)
 	if err != nil {
