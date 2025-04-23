@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sync/atomic"
 
 	"github.com/stealthrocket/wasi-go"
 	wasigo "github.com/stealthrocket/wasi-go/imports"
@@ -38,6 +39,7 @@ const (
 	setResultLogs         = "setResultLogs"
 	getPluginConfig       = "getPluginConfig"
 	setResultStatusReason = "setResultStatusReason"
+	getShutdownRequested  = "getShutdownRequested"
 
 	// WASI extension name
 	wasmEdgeV2Extension = "wasmedgev2"
@@ -106,13 +108,18 @@ type stackKey struct{}
 
 // Stack holds the data being passed between the host and the guest
 type Stack struct {
-	CurrentTraces  ptrace.Traces
-	CurrentMetrics pmetric.Metrics
-	CurrentLogs    plog.Logs
-	ResultTraces   ptrace.Traces
-	ResultMetrics  pmetric.Metrics
-	ResultLogs     plog.Logs
-	StatusReason   string
+	CurrentTraces     ptrace.Traces
+	CurrentMetrics    pmetric.Metrics
+	CurrentLogs       plog.Logs
+	ResultTraces      ptrace.Traces
+	ResultMetrics     pmetric.Metrics
+	ResultLogs        plog.Logs
+	StatusReason      string
+	RequestedShutdown atomic.Bool
+
+	OnResultMetricsChange func(pmetric.Metrics)
+	OnResultLogsChange    func(plog.Logs)
+	OnResultTracesChange  func(ptrace.Traces)
 
 	// PluginConfigJSON is the plugin config in JSON representation passed to the guest
 	PluginConfigJSON []byte
@@ -292,6 +299,18 @@ func getPluginConfigFn(ctx context.Context, mod api.Module, stack []uint64) {
 	stack[0] = uint64(writeBytesIfUnderLimit(mod.Memory(), pluginConfig, buf, bufLimit))
 }
 
+func getShutdownRequestedFn(ctx context.Context, mod api.Module, stack []uint64) {
+	// Read the shutdown requested flag from the stack
+	shutdownRequested := paramsFromContext(ctx).RequestedShutdown.Load()
+
+	// Write the shutdown requested flag to the stack
+	if shutdownRequested {
+		stack[0] = 1
+	} else {
+		stack[0] = 0
+	}
+}
+
 func setResultTracesFn(ctx context.Context, mod api.Module, stack []uint64) {
 	// Read buffer pointer and size from the stack
 	buf := uint32(stack[0])
@@ -312,6 +331,10 @@ func setResultTracesFn(ctx context.Context, mod api.Module, stack []uint64) {
 
 	// Store the result traces in context
 	paramsFromContext(ctx).ResultTraces = traces
+	onResultTracesChange := paramsFromContext(ctx).OnResultTracesChange
+	if onResultTracesChange != nil {
+		onResultTracesChange(traces)
+	}
 }
 
 func setResultMetricsFn(ctx context.Context, mod api.Module, stack []uint64) {
@@ -334,6 +357,10 @@ func setResultMetricsFn(ctx context.Context, mod api.Module, stack []uint64) {
 
 	// Store the result metrics in context
 	paramsFromContext(ctx).ResultMetrics = metrics
+	onResultMetricsChange := paramsFromContext(ctx).OnResultMetricsChange
+	if onResultMetricsChange != nil {
+		onResultMetricsChange(metrics)
+	}
 }
 
 func setResultLogsFn(ctx context.Context, mod api.Module, stack []uint64) {
@@ -356,6 +383,10 @@ func setResultLogsFn(ctx context.Context, mod api.Module, stack []uint64) {
 
 	// Store the result logs in context
 	paramsFromContext(ctx).ResultLogs = logs
+	onResultLogsChange := paramsFromContext(ctx).OnResultLogsChange
+	if onResultLogsChange != nil {
+		onResultLogsChange(logs)
+	}
 }
 
 func setResultStatusReasonFn(ctx context.Context, mod api.Module, stack []uint64) {
@@ -400,6 +431,9 @@ func instantiateHostModule(ctx context.Context, runtime wazero.Runtime) (api.Mod
 		NewFunctionBuilder().
 		WithGoModuleFunction(api.GoModuleFunc(setResultStatusReasonFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{}).
 		WithParameterNames("buf", "buf_len").Export(setResultStatusReason).
+		NewFunctionBuilder().
+		WithGoModuleFunction(api.GoModuleFunc(getShutdownRequestedFn), []api.ValueType{}, []api.ValueType{api.ValueTypeI32}).
+		Export(getShutdownRequested).
 		Instantiate(ctx)
 }
 

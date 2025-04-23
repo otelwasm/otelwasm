@@ -1,12 +1,32 @@
 package api
 
 import (
+	"context"
+
 	"go.opentelemetry.io/collector/pdata/plog"
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 )
 
 type Plugin interface{}
+
+type TracesReceiver interface {
+	Plugin
+
+	StartTraces(ctx context.Context)
+}
+
+type LogsReceiver interface {
+	Plugin
+
+	StartLogs(ctx context.Context)
+}
+
+type MetricsReceiver interface {
+	Plugin
+
+	StartMetrics(ctx context.Context)
+}
 
 type TracesProcessor interface {
 	Plugin

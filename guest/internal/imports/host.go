@@ -17,7 +17,6 @@
 package imports
 
 import (
-	"fmt"
 	"runtime"
 
 	"github.com/musaprg/otelwasm/guest/api"
@@ -86,36 +85,6 @@ func CurrentLogs() plog.Logs {
 	return logs
 }
 
-func SetResultTraces(traces ptrace.Traces) {
-	marshaler := ptrace.ProtoMarshaler{}
-	rawMsg, err := marshaler.MarshalTraces(traces)
-	if err != nil {
-		fmt.Println(err)
-		panic(err)
-	}
-	ptr, size := mem.BytesToPtr(rawMsg)
-	setResultTraces(ptr, size)
-	runtime.KeepAlive(rawMsg) // until ptr is no longer needed
-}
-
-func SetResultMetrics(metrics pmetric.Metrics) {
-	marshaler := pmetric.ProtoMarshaler{}
-	rawMsg, err := marshaler.MarshalMetrics(metrics)
-	if err != nil {
-		panic(err)
-	}
-	ptr, size := mem.BytesToPtr(rawMsg)
-	setResultMetrics(ptr, size)
-	runtime.KeepAlive(rawMsg) // until ptr is no longer needed
-}
-
-func SetResultLogs(logs plog.Logs) {
-	marshaler := plog.ProtoMarshaler{}
-	rawMsg, err := marshaler.MarshalLogs(logs)
-	if err != nil {
-		panic(err)
-	}
-	ptr, size := mem.BytesToPtr(rawMsg)
-	setResultLogs(ptr, size)
-	runtime.KeepAlive(rawMsg) // until ptr is no longer needed
+func GetShutdownRequested() bool {
+	return getShutdownRequested() != 0
 }
