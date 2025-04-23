@@ -61,7 +61,7 @@ func createTraces(
 	set receiver.Settings,
 	cfg component.Config,
 	nextConsumer consumer.Traces,
-) (receiver.Logs, error) {
+) (receiver.Traces, error) {
 	_, wasmreceiver, err := newTracesWasmReceiver(ctx, cfg.(*Config), nextConsumer, set.Logger)
 	if err != nil {
 		return nil, err
