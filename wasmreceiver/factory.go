@@ -23,7 +23,6 @@ func NewFactory() receiver.Factory {
 	return receiver.NewFactory(
 		typeStr,
 		createDefaultConfig,
-		// receiver.WithTraces(createTraces, component.StabilityLevelAlpha),
 		receiver.WithMetrics(createMetrics, component.StabilityLevelAlpha),
 		receiver.WithLogs(createLogs, component.StabilityLevelAlpha),
 		receiver.WithTraces(createTraces, component.StabilityLevelAlpha),
