@@ -4,15 +4,13 @@ dist:
   output_path: ./otelcol-dev
 
 exporters:
-  - gomod: go.opentelemetry.io/collector/exporter/debugexporter v0.123.0
-  - gomod: go.opentelemetry.io/collector/exporter/otlpexporter v0.123.0
+  - gomod: github.com/musaprg/otelwasm/wasmexporter v0.88.0
 
 processors:
-  - gomod: go.opentelemetry.io/collector/processor/batchprocessor v0.123.0
   - gomod: github.com/musaprg/otelwasm/wasmprocessor v0.88.0
 
 receivers:
-  - gomod: go.opentelemetry.io/collector/receiver/otlpreceiver v0.123.0
+  - gomod: github.com/musaprg/otelwasm/wasmreceiver v0.88.0
 
 providers:
   - gomod: go.opentelemetry.io/collector/confmap/provider/envprovider v1.18.0
@@ -23,3 +21,6 @@ providers:
 
 replaces:
   - github.com/musaprg/otelwasm/wasmprocessor => ../wasmprocessor
+  - github.com/musaprg/otelwasm/wasmexporter => ../wasmexporter
+  - github.com/musaprg/otelwasm/wasmplugin => ../wasmplugin
+  - github.com/musaprg/otelwasm/wasmreceiver => ../wasmreceiver
