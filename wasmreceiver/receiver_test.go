@@ -12,7 +12,7 @@ func TestProcessMetricsWithNopReceiver(t *testing.T) {
 	cfg.Path = "testdata/nop/main.wasm"
 	ctx := t.Context()
 	settings := receivertest.NewNopSettings(typeStr)
-	ctx, wasmProc, err := newMetricsWasmReceiver(ctx, cfg, consumertest.NewNop(), settings.Logger)
+	ctx, wasmProc, err := newMetricsWasmReceiver(ctx, cfg, consumertest.NewNop(), settings)
 	if err != nil {
 		t.Fatalf("failed to create wasm receiver: %v", err)
 	}
@@ -35,7 +35,7 @@ func TestProcessLogsWithNopReceiver(t *testing.T) {
 	cfg.Path = "testdata/nop/main.wasm"
 	ctx := t.Context()
 	settings := receivertest.NewNopSettings(typeStr)
-	ctx, wasmProc, err := newMetricsWasmReceiver(ctx, cfg, consumertest.NewNop(), settings.Logger)
+	ctx, wasmProc, err := newMetricsWasmReceiver(ctx, cfg, consumertest.NewNop(), settings)
 	if err != nil {
 		t.Fatalf("failed to create wasm receiver: %v", err)
 	}
@@ -58,7 +58,7 @@ func TestProcessTracesWithNopReceiver(t *testing.T) {
 	cfg.Path = "testdata/nop/main.wasm"
 	ctx := t.Context()
 	settings := receivertest.NewNopSettings(typeStr)
-	ctx, wasmProc, err := newMetricsWasmReceiver(ctx, cfg, consumertest.NewNop(), settings.Logger)
+	ctx, wasmProc, err := newMetricsWasmReceiver(ctx, cfg, consumertest.NewNop(), settings)
 	if err != nil {
 		t.Fatalf("failed to create wasm receiver: %v", err)
 	}
