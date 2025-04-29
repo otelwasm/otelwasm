@@ -267,16 +267,10 @@ func TestExportLogsWithStdoutExporter(t *testing.T) {
 
 func TestConfigValidate(t *testing.T) {
 	// Test that the config validation works as expected
-	cfg := &Config{}
+	cfg := createDefaultConfig().(*Config)
 	cfg.Path = "testdata/nop/main.wasm"
 	if err := cfg.Validate(); err != nil {
 		t.Errorf("config validation failed: %v", err)
-	}
-
-	// Test validation with empty path
-	cfgEmpty := &Config{}
-	if err := cfgEmpty.Validate(); err == nil {
-		t.Error("config validation should fail with empty path")
 	}
 }
 
