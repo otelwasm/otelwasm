@@ -22,14 +22,8 @@ func newWasmProcessor(ctx context.Context, cfg *Config) (*wasmProcessor, error) 
 	// Specify required functions for the processor
 	requiredFunctions := []string{"processTraces", "processMetrics", "processLogs"}
 
-	// Create a wasmplugin configuration from our processor config
-	pluginCfg := &wasmplugin.Config{
-		Path:         cfg.Path,
-		PluginConfig: cfg.PluginConfig,
-	}
-
 	// Initialize the WASM plugin
-	plugin, err := wasmplugin.NewWasmPlugin(ctx, pluginCfg, requiredFunctions)
+	plugin, err := wasmplugin.NewWasmPlugin(ctx, &cfg.Config, requiredFunctions)
 	if err != nil {
 		return nil, err
 	}
