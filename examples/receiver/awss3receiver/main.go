@@ -72,6 +72,8 @@ func (n *OTLPReceiver) initConfig() {
 		logger.Fatal("failed to get config", zap.Error(err))
 	}
 
+	n.cfg = n.factory.CreateDefaultConfig().(*awss3receiver.Config)
+
 	if err := mapstructure.Decode(config, &n.cfg); err != nil {
 		logger.Fatal("failed to decode config", zap.Error(err))
 	}

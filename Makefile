@@ -101,3 +101,4 @@ copy-wasm-examples: build-wasm-examples
 	@cp examples/exporter/nop/main.wasm wasmexporter/testdata/nop/
 	@cp examples/exporter/stdout/main.wasm wasmexporter/testdata/stdout/
 	@cp examples/receiver/nop/main.wasm wasmreceiver/testdata/nop/
+	@cp examples/receiver/awss3receiver/main.wasm wasmreceiver/testdata/awss3/
