@@ -18,7 +18,7 @@ var (
 func createDefaultConfig() component.Config {
 	cfg := &Config{}
 	cfg.RuntimeConfig.Default()
-	return &Config{}
+	return cfg
 }
 
 // NewFactory creates a factory for wasmexporter.
