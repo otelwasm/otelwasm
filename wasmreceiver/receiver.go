@@ -33,12 +33,7 @@ func newMetricsWasmReceiver(ctx context.Context, cfg *Config, nextConsumerM cons
 
 	requiredFunctions := []string{"startMetricsReceiver"}
 
-	pluginCfg := &wasmplugin.Config{
-		Path:         cfg.Path,
-		PluginConfig: cfg.PluginConfig,
-	}
-
-	plugin, err := wasmplugin.NewWasmPlugin(ctx, pluginCfg, requiredFunctions)
+	plugin, err := wasmplugin.NewWasmPlugin(ctx, &cfg.Config, requiredFunctions)
 	if err != nil {
 		return ctx, nil, err
 	}
@@ -58,12 +53,7 @@ func newLogsWasmReceiver(ctx context.Context, cfg *Config, nextConsumerL consume
 
 	requiredFunctions := []string{"startLogsReceiver"}
 
-	pluginCfg := &wasmplugin.Config{
-		Path:         cfg.Path,
-		PluginConfig: cfg.PluginConfig,
-	}
-
-	plugin, err := wasmplugin.NewWasmPlugin(ctx, pluginCfg, requiredFunctions)
+	plugin, err := wasmplugin.NewWasmPlugin(ctx, &cfg.Config, requiredFunctions)
 	if err != nil {
 		return ctx, nil, err
 	}
@@ -83,12 +73,7 @@ func newTracesWasmReceiver(ctx context.Context, cfg *Config, nextConsumerT consu
 
 	requiredFunctions := []string{"startTracesReceiver"}
 
-	pluginCfg := &wasmplugin.Config{
-		Path:         cfg.Path,
-		PluginConfig: cfg.PluginConfig,
-	}
-
-	plugin, err := wasmplugin.NewWasmPlugin(ctx, pluginCfg, requiredFunctions)
+	plugin, err := wasmplugin.NewWasmPlugin(ctx, &cfg.Config, requiredFunctions)
 	if err != nil {
 		return ctx, nil, err
 	}
