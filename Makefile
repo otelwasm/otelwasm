@@ -58,9 +58,10 @@ format:
 
 .PHONY: test
 test:
-	@(cd wasmprocessor; go test -v ./...)
-	@(cd wasmexporter; go test -v ./...)
-	@(cd guest; go test -v ./...)
+	@(cd wasmprocessor; go test -v -tags docker ./...)
+	@(cd wasmexporter; go test -v -tags docker ./...)
+	@(cd wasmreceiver; go test -v -tags docker ./...)
+	@(cd guest; go test -v -tags docker ./...)
 
 examples/processor/nop/main.wasm: examples/processor/nop/main.go
 	@(cd $(@D); GOOS=wasip1 GOARCH=wasm go build -buildmode=c-shared -o main.wasm ./...)
