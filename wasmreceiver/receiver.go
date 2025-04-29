@@ -101,9 +101,11 @@ func newTracesWasmReceiver(ctx context.Context, cfg *Config, nextConsumerT consu
 	}, nil
 }
 
-var _ receiver.Metrics = (*Receiver)(nil)
-var _ receiver.Logs = (*Receiver)(nil)
-var _ receiver.Traces = (*Receiver)(nil)
+var (
+	_ receiver.Metrics = (*Receiver)(nil)
+	_ receiver.Logs    = (*Receiver)(nil)
+	_ receiver.Traces  = (*Receiver)(nil)
+)
 
 // Start tells the component to start. Host parameter can be used for communicating
 // with the host after Start() has already returned. If an error is returned by

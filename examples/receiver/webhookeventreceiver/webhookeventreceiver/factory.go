@@ -4,9 +4,8 @@
 package webhookeventreceiver // import "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/webhookeventreceiver"
 
 import (
-	"go.opentelemetry.io/collector/component"
-
 	"github.com/musaprg/otelwasm/examples/receiver/webhookeventreceiver/webhookeventreceiver/metadata"
+	"go.opentelemetry.io/collector/component"
 )
 
 var scopeLogName = "otlp/" + metadata.Type.String()
