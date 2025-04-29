@@ -67,7 +67,6 @@ type Config struct {
 
 // Validate validates the configuration
 func (cfg *Config) Validate() error {
-	cfg.Default()
 	if err := cfg.RuntimeConfig.Validate(); err != nil {
 		return err
 	}
