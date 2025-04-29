@@ -58,9 +58,10 @@ format:
 
 .PHONY: test
 test:
-	@(cd wasmprocessor; go test -v ./...)
-	@(cd wasmexporter; go test -v ./...)
-	@(cd guest; go test -v ./...)
+	@(cd wasmprocessor; go test -v -tags docker ./...)
+	@(cd wasmexporter; go test -v -tags docker ./...)
+	@(cd wasmreceiver; go test -v -tags docker ./...)
+	@(cd guest; go test -v -tags docker ./...)
 
 examples/processor/nop/main.wasm: examples/processor/nop/main.go
 	@(cd $(@D); GOOS=wasip1 GOARCH=wasm go build -buildmode=c-shared -o main.wasm ./...)
@@ -85,8 +86,12 @@ examples/receiver/webhookeventreceiver/main.wasm: examples/receiver/webhookevent
 	# getaddrinfo buildtag is necessary to use sock_getaddrinfo for name resolution
 	@(cd $(@D); GOOS=wasip1 GOARCH=wasm go build -buildmode=c-shared -tags="getaddrinfo" -o main.wasm main.go)
 
+examples/receiver/awss3receiver/main.wasm: examples/receiver/awss3receiver/main.go
+	# getaddrinfo buildtag is necessary to use sock_getaddrinfo for name resolution
+	@(cd $(@D); GOOS=wasip1 GOARCH=wasm go build -buildmode=c-shared -tags="getaddrinfo" -o main.wasm main.go)
+
 .PHONY: build-wasm-examples
-build-wasm-examples: examples/processor/nop/main.wasm examples/processor/add_new_attribute/main.wasm examples/processor/curl/main.wasm examples/exporter/nop/main.wasm examples/exporter/stdout/main.wasm examples/receiver/nop/main.wasm examples/receiver/webhookeventreceiver/main.wasm
+build-wasm-examples: examples/processor/nop/main.wasm examples/processor/add_new_attribute/main.wasm examples/processor/curl/main.wasm examples/exporter/nop/main.wasm examples/exporter/stdout/main.wasm examples/receiver/nop/main.wasm examples/receiver/webhookeventreceiver/main.wasm examples/receiver/awss3receiver/main.wasm
 
 .PHONY: copy-wasm-examples
 copy-wasm-examples: build-wasm-examples
@@ -97,3 +102,4 @@ copy-wasm-examples: build-wasm-examples
 	@cp examples/exporter/nop/main.wasm wasmexporter/testdata/nop/
 	@cp examples/exporter/stdout/main.wasm wasmexporter/testdata/stdout/
 	@cp examples/receiver/nop/main.wasm wasmreceiver/testdata/nop/
+	@cp examples/receiver/awss3receiver/main.wasm wasmreceiver/testdata/awss3/

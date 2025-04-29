@@ -136,7 +136,7 @@ func NewWasmPlugin(ctx context.Context, cfg *Config, requiredFunctions []string)
 	var sys wasi.System
 	ctx, sys, err = wasigo.NewBuilder().
 		WithSocketsExtension(wasmEdgeV2Extension, guest).
-		Instantiate(ctx, runtime)
+		WithEnv(os.Environ()...).Instantiate(ctx, runtime)
 	if err != nil {
 		return nil, fmt.Errorf("wasm: error instantiating wasi module: %w", err)
 	}
