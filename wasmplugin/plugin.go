@@ -127,7 +127,7 @@ func NewWasmPlugin(ctx context.Context, cfg *Config, requiredFunctions []string)
 		return nil, err
 	}
 
-	runtime, guest, err := prepareRuntime(ctx, bytes)
+	runtime, guest, err := prepareRuntime(ctx, bytes, cfg.RuntimeConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -191,9 +191,19 @@ func NewWasmPlugin(ctx context.Context, cfg *Config, requiredFunctions []string)
 }
 
 // prepareRuntime initializes a new WebAssembly runtime
-func prepareRuntime(ctx context.Context, guestBin []byte) (runtime wazero.Runtime, guest wazero.CompiledModule, err error) {
+func prepareRuntime(ctx context.Context, guestBin []byte, rc RuntimeConfig) (runtime wazero.Runtime, guest wazero.CompiledModule, err error) {
 	// TODO: Switch to compiler backend after fixing the memory allocator issue in wazero
-	runtime = wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfigInterpreter())
+	var wrc wazero.RuntimeConfig
+	switch rc.Mode {
+	case RuntimeModeInterpreter:
+		wrc = wazero.NewRuntimeConfigInterpreter()
+	case RuntimeModeCompiled:
+		// TODO: Add validation of supported platforms and architectures
+		wrc = wazero.NewRuntimeConfigCompiler()
+	default:
+		return nil, nil, fmt.Errorf("wasm: invalid runtime mode: %s", rc.Mode)
+	}
+	runtime = wazero.NewRuntimeWithConfig(ctx, wrc)
 
 	guest, err = compileGuest(ctx, runtime, guestBin)
 	if err != nil {
