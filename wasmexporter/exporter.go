@@ -22,14 +22,8 @@ func newWasmExporter(ctx context.Context, cfg *Config) (*wasmExporter, error) {
 	// Specify required functions for the exporter
 	requiredFunctions := []string{"pushTraces", "pushMetrics", "pushLogs"}
 
-	// Create a wasmplugin configuration from our exporter config
-	pluginCfg := &wasmplugin.Config{
-		Path:         cfg.Path,
-		PluginConfig: cfg.PluginConfig,
-	}
-
 	// Initialize the WASM plugin
-	plugin, err := wasmplugin.NewWasmPlugin(ctx, pluginCfg, requiredFunctions)
+	plugin, err := wasmplugin.NewWasmPlugin(ctx, &cfg.Config, requiredFunctions)
 	if err != nil {
 		return nil, err
 	}

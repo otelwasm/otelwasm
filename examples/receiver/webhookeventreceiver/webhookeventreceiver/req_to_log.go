@@ -11,10 +11,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/musaprg/otelwasm/examples/receiver/webhookeventreceiver/webhookeventreceiver/metadata"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/plog"
-
-	"github.com/musaprg/otelwasm/examples/receiver/webhookeventreceiver/webhookeventreceiver/metadata"
 )
 
 const (

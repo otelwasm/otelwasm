@@ -17,6 +17,7 @@ import (
 
 	jsoniter "github.com/json-iterator/go"
 	"github.com/julienschmidt/httprouter"
+	wasinet "github.com/musaprg/dispatchrunnet/wasip1"
 	"github.com/rs/cors"
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/component/componentstatus"
@@ -24,8 +25,6 @@ import (
 	"go.opentelemetry.io/collector/receiver"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"golang.org/x/net/http2"
-
-	wasinet "github.com/musaprg/dispatchrunnet/wasip1"
 )
 
 var (
@@ -631,5 +630,4 @@ func (er *eventReceiver) failBadReq(_ context.Context,
 	// 	msg := string(jsonResp)
 	// 	er.settings.Logger.Debug(msg, zap.Int("http_status_code", httpStatusCode), zap.Error(err))
 	// }
-
 }
