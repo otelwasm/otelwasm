@@ -144,7 +144,8 @@ func TestS3Metrics(t *testing.T) {
 			t.Fatalf("failed to start wasm receiver: %v", err)
 		}
 
-		time.Sleep(20 * time.Second)
+		// TODO(tsuzu): Use event-driven approach instead of sleep
+		time.Sleep(10 * time.Second)
 
 		// Stop the metrics receiver
 		err = wasmProc.Shutdown(ctx)
