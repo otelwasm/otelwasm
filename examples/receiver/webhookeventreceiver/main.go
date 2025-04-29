@@ -18,9 +18,7 @@ func init() {
 }
 func main() {}
 
-var (
-	_ api.LogsReceiver = (*WebhookEventReceiver)(nil)
-)
+var _ api.LogsReceiver = (*WebhookEventReceiver)(nil)
 
 type logConsumer struct{}
 
@@ -36,8 +34,7 @@ func (c *logConsumer) ConsumeLogs(ctx context.Context, logs plog.Logs) error {
 	return nil
 }
 
-type host struct {
-}
+type host struct{}
 
 func (h *host) GetExtensions() map[component.ID]component.Component {
 	return nil

@@ -14,17 +14,16 @@ import (
 	"net/url"
 	"time"
 
-	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
-	"go.opentelemetry.io/otel"
-	"golang.org/x/net/http2"
-	"golang.org/x/net/publicsuffix"
-
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/config/configauth"
 	"go.opentelemetry.io/collector/config/configcompression"
 	"go.opentelemetry.io/collector/config/configopaque"
 	"go.opentelemetry.io/collector/config/configtls"
 	"go.opentelemetry.io/collector/extension/extensionauth"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/publicsuffix"
 )
 
 const (
