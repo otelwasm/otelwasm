@@ -3,10 +3,11 @@ package main
 import (
 	"context"
 
+	"github.com/go-viper/mapstructure/v2"
+	"github.com/musaprg/otelwasm/examples/receiver/awss3receiver/upstream/awss3receiver"
 	"github.com/musaprg/otelwasm/guest/api"
 	"github.com/musaprg/otelwasm/guest/imports"
 	"github.com/musaprg/otelwasm/guest/plugin" // register receivers
-	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awss3receiver"
 	_ "github.com/stealthrocket/net/http"
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/component/componenttest"
@@ -36,13 +37,8 @@ func init() {
 	telemetrySettings.Logger = logger
 	otlpReceiver.factory = awss3receiver.NewFactory()
 
-	err = imports.GetConfig(&otlpReceiver.cfg)
-	if err != nil {
-		logger.Fatal("failed to get config", zap.Error(err))
-	}
-
 	settings := receiver.Settings{
-		ID:                component.MustNewID("otelwasm"),
+		ID:                component.MustNewID("awss3"),
 		TelemetrySettings: telemetrySettings,
 		BuildInfo:         component.NewDefaultBuildInfo(),
 	}
@@ -59,14 +55,33 @@ var (
 
 type OTLPReceiver struct {
 	factory  receiver.Factory
-	cfg      any
+	cfg      *awss3receiver.Config
 	settings receiver.Settings
 
 	guestConsumer *guestConsumer
 }
 
+func (n *OTLPReceiver) initConfig() {
+	if n.cfg != nil {
+		return
+	}
+
+	var config any
+	err := imports.GetConfig(&config)
+	if err != nil {
+		logger.Fatal("failed to get config", zap.Error(err))
+	}
+
+	if err := mapstructure.Decode(config, &n.cfg); err != nil {
+		logger.Fatal("failed to decode config", zap.Error(err))
+	}
+	n.settings.Logger.Debug("config", zap.Any("config", n.cfg))
+}
+
 // StartLogs implements api.LogsReceiver.
 func (n *OTLPReceiver) StartLogs(ctx context.Context) {
+	n.initConfig()
+
 	logsConsumer, err := consumer.NewLogs(n.guestConsumer.ConsumeLogs, consumer.WithCapabilities(consumer.Capabilities{MutatesData: true}))
 	if err != nil {
 		logger.Fatal("failed to create logs consumer", zap.Error(err))
@@ -90,6 +105,8 @@ func (n *OTLPReceiver) StartLogs(ctx context.Context) {
 }
 
 func (n *OTLPReceiver) StartMetrics(ctx context.Context) {
+	n.initConfig()
+
 	metricsConsumer, err := consumer.NewMetrics(n.guestConsumer.ConsumeMetrics, consumer.WithCapabilities(consumer.Capabilities{MutatesData: true}))
 	if err != nil {
 		logger.Fatal("failed to create metrics consumer", zap.Error(err))
@@ -113,6 +130,8 @@ func (n *OTLPReceiver) StartMetrics(ctx context.Context) {
 }
 
 func (n *OTLPReceiver) StartTraces(ctx context.Context) {
+	n.initConfig()
+
 	tracesConsumer, err := consumer.NewTraces(n.guestConsumer.ConsumeTraces, consumer.WithCapabilities(consumer.Capabilities{MutatesData: true}))
 	if err != nil {
 		logger.Fatal("failed to create traces consumer", zap.Error(err))
