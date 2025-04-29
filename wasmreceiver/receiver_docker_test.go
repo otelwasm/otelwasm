@@ -16,7 +16,9 @@ import (
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 	"go.opentelemetry.io/collector/consumer/consumertest"
+	"go.opentelemetry.io/collector/pdata/plog"
 	"go.opentelemetry.io/collector/pdata/pmetric"
+	"go.opentelemetry.io/collector/pdata/ptrace"
 	"go.opentelemetry.io/collector/receiver/receivertest"
 )
 
@@ -33,7 +35,7 @@ func runInContainer(ctx context.Context, t *testing.T, container *testcontainers
 	}
 }
 
-func TestS3Metrics(t *testing.T) {
+func TestS3Receiver(t *testing.T) {
 	ctx := t.Context()
 
 	wd, err := os.Getwd()
@@ -92,85 +94,194 @@ func TestS3Metrics(t *testing.T) {
 		"myminio/testbucket",
 	)
 
-	t.Run("metrics", func(t *testing.T) {
+	resetBucket := func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
 		runInContainer(ctx, t, container,
 			"mc",
-			"cp",
+			"rm",
+			"--force",
 			"--recursive",
-			"/testdata/awss3/testdata/metrics/input/",
 			"myminio/testbucket",
 		)
+	}
 
-		t.Cleanup(func() {
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-			defer cancel()
+	cases := []struct {
+		name         string
+		inputDir     string
+		expectedPath string
+		prepare      func(t *testing.T, sink *sink) (context.Context, *Receiver)
+	}{
+		{
+			name:         "metrics",
+			inputDir:     "testdata/awss3/testdata/metrics/input/",
+			expectedPath: "testdata/awss3/testdata/metrics/output/metrics.json",
+			prepare: func(t *testing.T, sink *sink) (context.Context, *Receiver) {
+				cfg := createDefaultConfig().(*Config)
+				cfg.PluginConfig = map[string]any{
+					"starttime": "2025-01-01 00:00",
+					"endtime":   "2025-01-01 01:00",
+					"s3downloader": map[string]any{
+						"region":              "us-east-1",
+						"s3_bucket":           "testbucket",
+						"s3_partition":        "hour",
+						"endpoint":            "http://127.0.1:9000",
+						"disable_ssl":         true,
+						"s3_force_path_style": true,
+					},
+				}
 
+				cfg.Path = "testdata/awss3/main.wasm"
+				ctx := t.Context()
+				settings := receivertest.NewNopSettings(typeStr)
+
+				ctx, wasmProc, err := newMetricsWasmReceiver(ctx, cfg, &sink.metricsSink, settings)
+				if err != nil {
+					t.Fatalf("failed to create wasm receiver: %v", err)
+				}
+
+				return ctx, wasmProc
+			},
+		},
+		{
+			name:         "logs",
+			inputDir:     "testdata/awss3/testdata/logs/input/",
+			expectedPath: "testdata/awss3/testdata/logs/output/logs.json",
+			prepare: func(t *testing.T, sink *sink) (context.Context, *Receiver) {
+				cfg := createDefaultConfig().(*Config)
+				cfg.PluginConfig = map[string]any{
+					"starttime": "2025-01-01 00:00",
+					"endtime":   "2025-01-01 01:00",
+					"s3downloader": map[string]any{
+						"region":              "us-east-1",
+						"s3_bucket":           "testbucket",
+						"s3_partition":        "hour",
+						"endpoint":            "http://127.0.1:9000",
+						"disable_ssl":         true,
+						"s3_force_path_style": true,
+					},
+				}
+
+				cfg.Path = "testdata/awss3/main.wasm"
+				ctx := t.Context()
+				settings := receivertest.NewNopSettings(typeStr)
+
+				ctx, wasmProc, err := newLogsWasmReceiver(ctx, cfg, &sink.logsSink, settings)
+				if err != nil {
+					t.Fatalf("failed to create wasm receiver: %v", err)
+				}
+
+				return ctx, wasmProc
+			},
+		},
+		{
+			name:         "traces",
+			inputDir:     "testdata/awss3/testdata/traces/input/",
+			expectedPath: "testdata/awss3/testdata/traces/output/traces.json",
+			prepare: func(t *testing.T, sink *sink) (context.Context, *Receiver) {
+				cfg := createDefaultConfig().(*Config)
+				cfg.PluginConfig = map[string]any{
+					"starttime": "2025-01-01 00:00",
+					"endtime":   "2025-01-01 01:00",
+					"s3downloader": map[string]any{
+						"region":              "us-east-1",
+						"s3_bucket":           "testbucket",
+						"s3_partition":        "hour",
+						"endpoint":            "http://127.0.1:9000",
+						"disable_ssl":         true,
+						"s3_force_path_style": true,
+					},
+				}
+
+				cfg.Path = "testdata/awss3/main.wasm"
+				ctx := t.Context()
+				settings := receivertest.NewNopSettings(typeStr)
+
+				ctx, wasmProc, err := newTracesWasmReceiver(ctx, cfg, &sink.tracesSink, settings)
+				if err != nil {
+					t.Fatalf("failed to create wasm receiver: %v", err)
+				}
+
+				return ctx, wasmProc
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
 			runInContainer(ctx, t, container,
 				"mc",
-				"rm",
-				"--force",
+				"cp",
 				"--recursive",
+				tc.inputDir,
 				"myminio/testbucket",
 			)
+
+			t.Cleanup(resetBucket)
+
+			sink := &sink{}
+			ctx, wasmProc := tc.prepare(t, sink)
+
+			// Start the receiver
+			err = wasmProc.Start(ctx, nil)
+			if err != nil {
+				t.Fatalf("failed to start wasm receiver: %v", err)
+			}
+
+			// TODO(tsuzu): Use event-driven approach instead of sleep
+			time.Sleep(5 * time.Second)
+
+			// Stop the receiver
+			err = wasmProc.Shutdown(ctx)
+			if err != nil {
+				t.Fatalf("failed to stop wasm receiver: %v", err)
+			}
+
+			actual := sink.encodeSink(t)
+			t.Log(string(actual))
+
+			expected, err := os.ReadFile(filepath.Join(wd, tc.expectedPath))
+			if err != nil {
+				t.Fatalf("failed to read expected file: %v", err)
+			}
+			if !bytes.Equal(bytes.TrimSpace(actual), bytes.TrimSpace(expected)) {
+				t.Fatalf("expected data do not match actual data:\n%s", string(actual))
+			}
 		})
+	}
+}
 
-		cfg := createDefaultConfig().(*Config)
-		cfg.PluginConfig = map[string]any{
-			"starttime": "2025-01-01 00:00",
-			"endtime":   "2025-01-01 01:00",
-			"s3downloader": map[string]any{
-				"region":              "us-east-1",
-				"s3_bucket":           "testbucket",
-				"s3_partition":        "hour",
-				"endpoint":            "http://127.0.0.1:9000",
-				"disable_ssl":         true,
-				"s3_force_path_style": true,
-			},
-		}
-		cfg.Path = "testdata/awss3/main.wasm"
-		ctx := t.Context()
-		settings := receivertest.NewNopSettings(typeStr)
+type sink struct {
+	metricsSink consumertest.MetricsSink
+	logsSink    consumertest.LogsSink
+	tracesSink  consumertest.TracesSink
+}
 
-		metricsSink := &consumertest.MetricsSink{}
-
-		ctx, wasmProc, err := newMetricsWasmReceiver(ctx, cfg, metricsSink, settings)
-		if err != nil {
-			t.Fatalf("failed to create wasm receiver: %v", err)
-		}
-
-		// Start the metrics receiver
-		err = wasmProc.Start(ctx, nil)
-		if err != nil {
-			t.Fatalf("failed to start wasm receiver: %v", err)
-		}
-
-		// TODO(tsuzu): Use event-driven approach instead of sleep
-		time.Sleep(10 * time.Second)
-
-		// Stop the metrics receiver
-		err = wasmProc.Shutdown(ctx)
-		if err != nil {
-			t.Fatalf("failed to stop wasm receiver: %v", err)
-		}
-
-		metrics := metricsSink.AllMetrics()
+func (s *sink) encodeSink(t *testing.T) []byte {
+	if s.metricsSink.DataPointCount() != 0 {
+		metrics := s.metricsSink.AllMetrics()
 		if len(metrics) == 0 {
 			t.Fatal("no metrics received")
 		}
-
-		actual := encodeMetricsIntoJSON(t, metrics)
-
-		t.Log(string(actual))
-
-		expected, err := os.ReadFile(filepath.Join(wd, "testdata/awss3/testdata/metrics/output/metrics.json"))
-		if err != nil {
-			t.Fatalf("failed to read expected metrics file: %v", err)
+		return encodeMetricsIntoJSON(t, metrics)
+	}
+	if s.logsSink.LogRecordCount() != 0 {
+		logs := s.logsSink.AllLogs()
+		if len(logs) == 0 {
+			t.Fatal("no logs received")
 		}
-
-		if !bytes.Equal(bytes.TrimSpace(actual), bytes.TrimSpace(expected)) {
-			t.Fatalf("expected metrics do not match actual metrics:\n%s", string(actual))
+		return encodeLogsIntoJSON(t, logs)
+	}
+	if s.tracesSink.SpanCount() != 0 {
+		traces := s.tracesSink.AllTraces()
+		if len(traces) == 0 {
+			t.Fatal("no traces received")
 		}
-	})
+		return encodeTracesIntoJSON(t, traces)
+	}
+	t.Fatal("no data received")
+	return nil
 }
 
 func encodeMetricsIntoJSON(t *testing.T, metrics []pmetric.Metrics) []byte {
@@ -183,6 +294,40 @@ func encodeMetricsIntoJSON(t *testing.T, metrics []pmetric.Metrics) []byte {
 		jsonBytes, err := marshaler.MarshalMetrics(m)
 		if err != nil {
 			t.Fatalf("failed to marshal metrics: %v", err)
+		}
+		buf.Write(jsonBytes)
+	}
+
+	return buf.Bytes()
+}
+
+func encodeLogsIntoJSON(t *testing.T, logs []plog.Logs) []byte {
+	t.Helper()
+
+	marshaler := plog.JSONMarshaler{}
+
+	var buf bytes.Buffer
+	for _, l := range logs {
+		jsonBytes, err := marshaler.MarshalLogs(l)
+		if err != nil {
+			t.Fatalf("failed to marshal logs: %v", err)
+		}
+		buf.Write(jsonBytes)
+	}
+
+	return buf.Bytes()
+}
+
+func encodeTracesIntoJSON(t *testing.T, traces []ptrace.Traces) []byte {
+	t.Helper()
+
+	marshaler := ptrace.JSONMarshaler{}
+
+	var buf bytes.Buffer
+	for _, tr := range traces {
+		jsonBytes, err := marshaler.MarshalTraces(tr)
+		if err != nil {
+			t.Fatalf("failed to marshal traces: %v", err)
 		}
 		buf.Write(jsonBytes)
 	}
