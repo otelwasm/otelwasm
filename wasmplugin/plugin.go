@@ -18,6 +18,7 @@ import (
 	"go.opentelemetry.io/collector/pdata/plog"
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.opentelemetry.io/collector/pdata/ptrace"
+	"go.uber.org/zap"
 )
 
 const (
@@ -26,6 +27,8 @@ const (
 
 	// otelWasm is the name of the host module
 	otelWasm = "opentelemetry.io/wasm"
+
+	otelZapLogger = "opentelemetry.io/zap/logger"
 
 	// Host function exports
 	currentTraces         = "currentTraces"
@@ -96,6 +99,9 @@ type WasmPlugin struct {
 	// This is a workaround to avoid panic when calling wasi functions with different context than the one used to instantiate the host module.
 	// TODO: Remove this if possible after replacing WASI implementation with our own.
 	wasiP1HostModule *wasi_snapshot_preview1.Module
+
+	// Logger is the logger instance
+	Logger *zap.Logger
 }
 
 // stackKey is the key used to store the stack in the context
@@ -118,6 +124,8 @@ type Stack struct {
 
 	// PluginConfigJSON is the plugin config in JSON representation passed to the guest
 	PluginConfigJSON []byte
+
+	Logger *zap.Logger
 }
 
 // paramsFromContext retrieves the Stack from the context
@@ -126,7 +134,7 @@ func paramsFromContext(ctx context.Context) *Stack {
 }
 
 // NewWasmPlugin creates a new WasmPlugin instance
-func NewWasmPlugin(ctx context.Context, cfg *Config, requiredFunctions []string) (*WasmPlugin, error) {
+func NewWasmPlugin(ctx context.Context, cfg *Config, requiredFunctions []string, logger *zap.Logger) (*WasmPlugin, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
@@ -209,6 +217,7 @@ func NewWasmPlugin(ctx context.Context, cfg *Config, requiredFunctions []string)
 		PluginConfigJSON:  pluginConfigJSON,
 		ExportedFunctions: exportedFunctions,
 		wasiP1HostModule:  wasiP1HostModule,
+		Logger:            logger,
 	}
 
 	return plugin, nil
@@ -257,6 +266,10 @@ func createContextWithStack(ctx context.Context, stack *Stack) context.Context {
 
 // ProcessFunctionCall executes a WASM function and handles stack management
 func (p *WasmPlugin) ProcessFunctionCall(ctx context.Context, functionName string, stack *Stack) ([]uint64, error) {
+	if stack.Logger == nil {
+		stack.Logger = p.Logger
+	}
+
 	ctx = createContextWithStack(ctx, stack)
 	// Set the WASI host module instance in the context
 	ctx = withModuleInstance(ctx, p.wasiP1HostModule)
@@ -455,6 +468,18 @@ func setResultStatusReasonFn(ctx context.Context, mod api.Module, stack []uint64
 
 	// Store the status reason in context
 	paramsFromContext(ctx).StatusReason = string(reasonBytes)
+}
+
+func zapLoggerDebugFn(ctx context.Context, mod api.Module, stack []uint64) {
+}
+
+func zapLoggerInfoFn(ctx context.Context, mod api.Module, stack []uint64) {
+}
+
+func zapLoggerWarnFn(ctx context.Context, mod api.Module, stack []uint64) {
+}
+
+func zapLoggerErrorFn(ctx context.Context, mod api.Module, stack []uint64) {
 }
 
 // instantiateHostModule creates and instantiates the host module with exported functions
