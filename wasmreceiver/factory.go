@@ -15,6 +15,8 @@ var (
 )
 
 func createDefaultConfig() component.Config {
+	cfg := &Config{}
+	cfg.RuntimeConfig.Default()
 	return &Config{}
 }
 
