@@ -20,9 +20,6 @@ import (
 	"go.opentelemetry.io/collector/pdata/ptrace"
 )
 
-// PluginConfig is a generic configuration type that can be passed to WASM modules
-type PluginConfig map[string]interface{}
-
 const (
 	// guestExportMemory is the name of the memory export in the guest module
 	guestExportMemory = "memory"
@@ -44,23 +41,6 @@ const (
 	// WASI extension name
 	wasmEdgeV2Extension = "wasmedgev2"
 )
-
-// Config defines the common configuration for WASM components
-type Config struct {
-	// Path to the WASM module file
-	Path string `mapstructure:"path"`
-
-	// PluginConfig is the configuration to be passed to the WASM module
-	PluginConfig PluginConfig `mapstructure:"plugin_config"`
-}
-
-// Validate validates the configuration
-func (cfg *Config) Validate() error {
-	if cfg.Path == "" {
-		return fmt.Errorf("path is required")
-	}
-	return nil
-}
 
 // StatusCode represents the result status code from WASM function calls
 type StatusCode uint32
