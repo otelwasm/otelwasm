@@ -8,24 +8,87 @@ import (
 	"go.opentelemetry.io/collector/pdata/plog"
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.opentelemetry.io/collector/pdata/ptrace"
+	"go.opentelemetry.io/collector/pipeline"
+)
+
+const (
+	processTracesFunctionName  = "processTraces"
+	processMetricsFunctionName = "processMetrics"
+	processLogsFunctionName    = "processLogs"
 )
 
 type wasmProcessor struct {
 	plugin *wasmplugin.WasmPlugin
 }
 
-func newWasmProcessor(ctx context.Context, cfg *Config) (*wasmProcessor, error) {
+func newWasmMetricsProcessor(ctx context.Context, cfg *Config) (*wasmProcessor, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
 
 	// Specify required functions for the processor
-	requiredFunctions := []string{"processTraces", "processMetrics", "processLogs"}
+	requiredFunctions := []string{processMetricsFunctionName}
 
 	// Initialize the WASM plugin
 	plugin, err := wasmplugin.NewWasmPlugin(ctx, &cfg.Config, requiredFunctions)
 	if err != nil {
 		return nil, err
+	}
+
+	if supported, err := plugin.IsMetricsSupported(ctx); err != nil {
+		return nil, fmt.Errorf("failed to check metrics support status: %w", err)
+	} else if !supported {
+		return nil, pipeline.ErrSignalNotSupported
+	}
+
+	return &wasmProcessor{
+		plugin: plugin,
+	}, nil
+}
+
+func newWasmLogsProcessor(ctx context.Context, cfg *Config) (*wasmProcessor, error) {
+	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
+
+	// Specify required functions for the processor
+	requiredFunctions := []string{processLogsFunctionName}
+
+	// Initialize the WASM plugin
+	plugin, err := wasmplugin.NewWasmPlugin(ctx, &cfg.Config, requiredFunctions)
+	if err != nil {
+		return nil, err
+	}
+
+	if supported, err := plugin.IsLogsSupported(ctx); err != nil {
+		return nil, fmt.Errorf("failed to check logs support status: %w", err)
+	} else if !supported {
+		return nil, pipeline.ErrSignalNotSupported
+	}
+
+	return &wasmProcessor{
+		plugin: plugin,
+	}, nil
+}
+
+func newWasmTracesProcessor(ctx context.Context, cfg *Config) (*wasmProcessor, error) {
+	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
+
+	// Specify required functions for the processor
+	requiredFunctions := []string{processTracesFunctionName}
+
+	// Initialize the WASM plugin
+	plugin, err := wasmplugin.NewWasmPlugin(ctx, &cfg.Config, requiredFunctions)
+	if err != nil {
+		return nil, err
+	}
+
+	if supported, err := plugin.IsTracesSupported(ctx); err != nil {
+		return nil, fmt.Errorf("failed to check traces support status: %w", err)
+	} else if !supported {
+		return nil, pipeline.ErrSignalNotSupported
 	}
 
 	return &wasmProcessor{
@@ -42,7 +105,7 @@ func (wp *wasmProcessor) processTraces(
 		PluginConfigJSON: wp.plugin.PluginConfigJSON,
 	}
 
-	res, err := wp.plugin.ProcessFunctionCall(ctx, "processTraces", stack)
+	res, err := wp.plugin.ProcessFunctionCall(ctx, processTracesFunctionName, stack)
 	if err != nil {
 		return td, err
 	}
@@ -64,7 +127,7 @@ func (wp *wasmProcessor) processMetrics(
 		PluginConfigJSON: wp.plugin.PluginConfigJSON,
 	}
 
-	res, err := wp.plugin.ProcessFunctionCall(ctx, "processMetrics", stack)
+	res, err := wp.plugin.ProcessFunctionCall(ctx, processMetricsFunctionName, stack)
 	if err != nil {
 		return md, err
 	}
@@ -86,7 +149,7 @@ func (wp *wasmProcessor) processLogs(
 		PluginConfigJSON: wp.plugin.PluginConfigJSON,
 	}
 
-	res, err := wp.plugin.ProcessFunctionCall(ctx, "processLogs", stack)
+	res, err := wp.plugin.ProcessFunctionCall(ctx, processLogsFunctionName, stack)
 	if err != nil {
 		return ld, err
 	}

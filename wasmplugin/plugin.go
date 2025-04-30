@@ -38,8 +38,23 @@ const (
 	setResultStatusReason = "setResultStatusReason"
 	getShutdownRequested  = "getShutdownRequested"
 
+	// Guest function
+	getSupportedTelemetry = "getSupportedTelemetry"
+
 	// WASI extension name
 	wasmEdgeV2Extension = "wasmedgev2"
+)
+
+var builtInGuestFunctions = []string{
+	getSupportedTelemetry,
+}
+
+type telemetryType uint32
+
+const (
+	telemetryTypeMetrics telemetryType = 1 << iota
+	telemetryTypeLogs
+	telemetryTypeTraces
 )
 
 // StatusCode represents the result status code from WASM function calls
@@ -167,7 +182,16 @@ func NewWasmPlugin(ctx context.Context, cfg *Config, requiredFunctions []string)
 	for _, funcName := range requiredFunctions {
 		fn := mod.ExportedFunction(funcName)
 		if fn == nil {
-			return nil, fmt.Errorf("wasm: guest doesn't export required function: %s", funcName)
+			return nil, fmt.Errorf("wasm: %s is not exported: %w", funcName, ErrRequiredFunctionNotExported)
+		}
+		exportedFunctions[funcName] = fn
+	}
+
+	// Check if all built-in guest functions are exported
+	for _, funcName := range builtInGuestFunctions {
+		fn := mod.ExportedFunction(funcName)
+		if fn == nil {
+			return nil, fmt.Errorf("wasm: %s is not exported: %w", funcName, ErrRequiredFunctionNotExported)
 		}
 		exportedFunctions[funcName] = fn
 	}
@@ -243,6 +267,45 @@ func (p *WasmPlugin) ProcessFunctionCall(ctx context.Context, functionName strin
 	}
 
 	return fn.Call(ctx)
+}
+
+func (p *WasmPlugin) supportedTelemetryTypes(ctx context.Context) (telemetryType, error) {
+	// TODO: Cache the result of this function to avoid calling it multiple times
+
+	res, err := p.ProcessFunctionCall(ctx, getSupportedTelemetry, &Stack{})
+	if err != nil {
+		return 0, fmt.Errorf("wasm: failed to get supported telemetry types: %w", err)
+	}
+
+	if len(res) == 0 {
+		return 0, fmt.Errorf("wasm: no supported telemetry types returned")
+	}
+
+	return telemetryType(res[0]), nil
+}
+
+func (p *WasmPlugin) IsMetricsSupported(ctx context.Context) (bool, error) {
+	telemetryTypes, err := p.supportedTelemetryTypes(ctx)
+	if err != nil {
+		return false, err
+	}
+	return telemetryTypes&telemetryTypeMetrics != 0, nil
+}
+
+func (p *WasmPlugin) IsLogsSupported(ctx context.Context) (bool, error) {
+	telemetryTypes, err := p.supportedTelemetryTypes(ctx)
+	if err != nil {
+		return false, err
+	}
+	return telemetryTypes&telemetryTypeLogs != 0, nil
+}
+
+func (p *WasmPlugin) IsTracesSupported(ctx context.Context) (bool, error) {
+	telemetryTypes, err := p.supportedTelemetryTypes(ctx)
+	if err != nil {
+		return false, err
+	}
+	return telemetryTypes&telemetryTypeTraces != 0, nil
 }
 
 // Shutdown closes the WASM runtime and system
