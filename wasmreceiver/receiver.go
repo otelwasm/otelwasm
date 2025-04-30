@@ -2,6 +2,7 @@ package wasmreceiver
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/musaprg/otelwasm/wasmplugin"
@@ -10,6 +11,7 @@ import (
 	"go.opentelemetry.io/collector/pdata/plog"
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.opentelemetry.io/collector/pdata/ptrace"
+	"go.opentelemetry.io/collector/pipeline"
 	"go.opentelemetry.io/collector/receiver"
 	"go.uber.org/zap"
 )
@@ -38,6 +40,12 @@ func newMetricsWasmReceiver(ctx context.Context, cfg *Config, nextConsumerM cons
 		return ctx, nil, err
 	}
 
+	if supported, err := plugin.IsMetricsSupported(ctx); err != nil {
+		return ctx, nil, fmt.Errorf("failed to check metrics support status: %w", err)
+	} else if !supported {
+		return ctx, nil, pipeline.ErrSignalNotSupported
+	}
+
 	return ctx, &Receiver{
 		cfg:           cfg,
 		plugin:        plugin,
@@ -58,6 +66,12 @@ func newLogsWasmReceiver(ctx context.Context, cfg *Config, nextConsumerL consume
 		return ctx, nil, err
 	}
 
+	if supported, err := plugin.IsLogsSupported(ctx); err != nil {
+		return ctx, nil, fmt.Errorf("failed to check logs support status: %w", err)
+	} else if !supported {
+		return ctx, nil, pipeline.ErrSignalNotSupported
+	}
+
 	return ctx, &Receiver{
 		cfg:           cfg,
 		plugin:        plugin,
@@ -76,6 +90,12 @@ func newTracesWasmReceiver(ctx context.Context, cfg *Config, nextConsumerT consu
 	plugin, err := wasmplugin.NewWasmPlugin(ctx, &cfg.Config, requiredFunctions)
 	if err != nil {
 		return ctx, nil, err
+	}
+
+	if supported, err := plugin.IsTracesSupported(ctx); err != nil {
+		return ctx, nil, fmt.Errorf("failed to check traces support status: %w", err)
+	} else if !supported {
+		return ctx, nil, pipeline.ErrSignalNotSupported
 	}
 
 	return ctx, &Receiver{
