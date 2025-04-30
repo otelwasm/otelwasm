@@ -167,7 +167,7 @@ func NewWasmPlugin(ctx context.Context, cfg *Config, requiredFunctions []string)
 	for _, funcName := range requiredFunctions {
 		fn := mod.ExportedFunction(funcName)
 		if fn == nil {
-			return nil, fmt.Errorf("wasm: guest doesn't export required function: %s", funcName)
+			return nil, fmt.Errorf("wasm: %s is not exported: %w", funcName, ErrRequiredFunctionNotExported)
 		}
 		exportedFunctions[funcName] = fn
 	}
