@@ -156,8 +156,7 @@ func (n *OTLPReceiver) StartTraces(ctx context.Context) {
 	}
 }
 
-type guestConsumer struct {
-}
+type guestConsumer struct{}
 
 func (c *guestConsumer) ConsumeLogs(ctx context.Context, ld plog.Logs) error {
 	imports.SetResultLogs(ld)

@@ -65,7 +65,6 @@ func TestS3Receiver(t *testing.T) {
 			hostConfig.Binds = append(hostConfig.Binds, filepath.Join(wd, "testdata")+":/testdata")
 		}),
 	)
-
 	if err != nil {
 		t.Fatalf("failed to start container: %v", err)
 	}
