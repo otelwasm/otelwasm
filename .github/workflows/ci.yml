@@ -7,6 +7,28 @@ on:
     branches: [ main ]
 
 jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Setup Go
+        uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
+        with:
+          go-version-file: wasmplugin/go.mod
+          cache: true
+          cache-dependency-path: wasmplugin/go.mod
+
+      - name: Run formatter
+        run: make format
+
+      - name: Check diff
+        run: |
+          git add -N .
+          git diff --exit-code
+
   test:
     name: Test
     runs-on: ubuntu-latest
