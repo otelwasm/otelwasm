@@ -2,7 +2,6 @@ package wasmprocessor
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/musaprg/otelwasm/wasmplugin"
@@ -33,10 +32,13 @@ func newWasmMetricsProcessor(ctx context.Context, cfg *Config) (*wasmProcessor, 
 	// Initialize the WASM plugin
 	plugin, err := wasmplugin.NewWasmPlugin(ctx, &cfg.Config, requiredFunctions)
 	if err != nil {
-		if errors.Is(err, wasmplugin.ErrRequiredFunctionNotExported) {
-			return nil, pipeline.ErrSignalNotSupported
-		}
 		return nil, err
+	}
+
+	if supported, err := plugin.IsMetricsSupported(ctx); err != nil {
+		return nil, fmt.Errorf("failed to check metrics support status: %w", err)
+	} else if !supported {
+		return nil, pipeline.ErrSignalNotSupported
 	}
 
 	return &wasmProcessor{
@@ -55,10 +57,13 @@ func newWasmLogsProcessor(ctx context.Context, cfg *Config) (*wasmProcessor, err
 	// Initialize the WASM plugin
 	plugin, err := wasmplugin.NewWasmPlugin(ctx, &cfg.Config, requiredFunctions)
 	if err != nil {
-		if errors.Is(err, wasmplugin.ErrRequiredFunctionNotExported) {
-			return nil, pipeline.ErrSignalNotSupported
-		}
 		return nil, err
+	}
+
+	if supported, err := plugin.IsLogsSupported(ctx); err != nil {
+		return nil, fmt.Errorf("failed to check logs support status: %w", err)
+	} else if !supported {
+		return nil, pipeline.ErrSignalNotSupported
 	}
 
 	return &wasmProcessor{
@@ -77,10 +82,13 @@ func newWasmTracesProcessor(ctx context.Context, cfg *Config) (*wasmProcessor, e
 	// Initialize the WASM plugin
 	plugin, err := wasmplugin.NewWasmPlugin(ctx, &cfg.Config, requiredFunctions)
 	if err != nil {
-		if errors.Is(err, wasmplugin.ErrRequiredFunctionNotExported) {
-			return nil, pipeline.ErrSignalNotSupported
-		}
 		return nil, err
+	}
+
+	if supported, err := plugin.IsTracesSupported(ctx); err != nil {
+		return nil, fmt.Errorf("failed to check traces support status: %w", err)
+	} else if !supported {
+		return nil, pipeline.ErrSignalNotSupported
 	}
 
 	return &wasmProcessor{
