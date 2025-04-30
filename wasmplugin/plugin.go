@@ -45,11 +45,9 @@ const (
 	wasmEdgeV2Extension = "wasmedgev2"
 )
 
-var (
-	builtInGuestFunctions = []string{
-		getSupportedTelemetry,
-	}
-)
+var builtInGuestFunctions = []string{
+	getSupportedTelemetry,
+}
 
 type telemetryType uint32
 
