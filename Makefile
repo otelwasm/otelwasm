@@ -13,44 +13,6 @@ $(1)
 
 endef
 
-.PHONY: proto-tools
-proto-tools:
-	cd ./pdata/proto/tools; \
-	cat tools.go | grep "_" | awk -F'"' '{print $$2}' | xargs -tI % go install %
-
-# TODO: Add rule to install protoc command as a dependency
-
-OPENTELEMETRY_PROTO_VERSION=v1.5.0
-.PHONY: submodule-update
-submodule-update:
-	git submodule update -i
-	cd ./pdata/opentelemetry-proto; \
-	git checkout $(OPENTELEMETRY_PROTO_VERSION)
-	# TODO: consider sparse checkout
-
-OPENTELEMETRY_PROTO_SRC_DIR=pdata/opentelemetry-proto
-OPENTELEMETRY_PROTO_FILES := $(subst $(OPENTELEMETRY_PROTO_SRC_DIR)/,,$(wildcard $(OPENTELEMETRY_PROTO_SRC_DIR)/opentelemetry/proto/*/v1/*.proto $(OPENTELEMETRY_PROTO_SRC_DIR)/opentelemetry/proto/*/v1development/*.proto))
-
-# This uses the exact generated protos from Kubernetes source, to ensure exact
-# wire-type parity. Otherwise, we need expensive to maintain conversion logic.
-# We can't use the go generated in the same source tree in TinyGo, because it
-# hangs compiling. Instead, we generate UnmarshalVT with go-plugin which is
-# known to work with TinyGo.
-.PHONY: update-pdata-proto
-update-pdata-proto: proto-tools
-	@echo Generating code for the following files:
-	@$(foreach file,$(OPENTELEMETRY_PROTO_FILES),$(call exec-command,echo $(file)))
-	cd ./pdata/opentelemetry-proto; \
-	protoc ./opentelemetry/proto/common/v1/common.proto --go-plugin_out=../proto \
-		--go-plugin_opt=Mopentelemetry/proto/common/v1/common.proto=./pcommon; \
-	protoc ./opentelemetry/proto/logs/v1/logs.proto --go-plugin_out=../proto \
-		--go-plugin_opt=Mopentelemetry/proto/logs/v1/logs.proto=./plog; \
-	protoc ./opentelemetry/proto/metrics/v1/metrics.proto --go-plugin_out=../proto \
-		--go-plugin_opt=Mopentelemetry/proto/metrics/v1/metrics.proto=./pmetric; \
-	protoc ./opentelemetry/proto/trace/v1/trace.proto --go-plugin_out=../proto \
-		--go-plugin_opt=Mopentelemetry/proto/trace/v1/trace.proto=./ptrace; \
-	# @$(MAKE) format
-
 .PHONY: format
 format:
 	@go run $(gofumpt) -l -w .
