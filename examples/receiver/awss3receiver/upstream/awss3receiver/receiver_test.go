@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/musaprg/otelwasm/examples/receiver/awss3receiver/upstream/awss3receiver/internal/metadata"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/collector/component"
@@ -21,8 +22,6 @@ import (
 	"go.opentelemetry.io/collector/receiver/receivertest"
 	conventions "go.opentelemetry.io/collector/semconv/v1.22.0"
 	"go.uber.org/zap"
-
-	"github.com/musaprg/otelwasm/examples/receiver/awss3receiver/upstream/awss3receiver/internal/metadata"
 )
 
 func generateTraceData() ptrace.Traces {

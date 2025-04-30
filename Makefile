@@ -54,7 +54,7 @@ update-pdata-proto: proto-tools
 .PHONY: format
 format:
 	@go run $(gofumpt) -l -w .
-	@go run $(gosimports) -local sigs.k8s.io/kube-scheduler-wasm-extension/ -w $(shell find . -name '*.go' -type f)
+	@go run $(gosimports) -w $(shell find . -name '*.go' -type f)
 
 .PHONY: test
 test:

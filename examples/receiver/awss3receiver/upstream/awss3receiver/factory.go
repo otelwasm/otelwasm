@@ -6,11 +6,10 @@ package awss3receiver // import "github.com/musaprg/otelwasm/examples/receiver/a
 import (
 	"context"
 
+	"github.com/musaprg/otelwasm/examples/receiver/awss3receiver/upstream/awss3receiver/internal/metadata"
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/consumer"
 	"go.opentelemetry.io/collector/receiver"
-
-	"github.com/musaprg/otelwasm/examples/receiver/awss3receiver/upstream/awss3receiver/internal/metadata"
 )
 
 func NewFactory() receiver.Factory {
