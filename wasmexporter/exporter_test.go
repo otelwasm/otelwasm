@@ -111,9 +111,9 @@ func TestExportTracesWithNopExporter(t *testing.T) {
 	cfg := createDefaultConfig().(*Config)
 	cfg.Path = "testdata/nop/main.wasm"
 	ctx := t.Context()
-	wasmExp, err := newWasmExporter(ctx, cfg)
+	wasmExp, err := newWasmTracesExporter(ctx, cfg)
 	if err != nil {
-		t.Fatalf("failed to create wasm exporter: %v", err)
+		t.Fatalf("failed to create wasm traces exporter: %v", err)
 	}
 
 	// Create test traces with 1 resource, 1 scope, and 1 span
@@ -138,9 +138,9 @@ func TestExportMetricsWithNopExporter(t *testing.T) {
 	cfg := createDefaultConfig().(*Config)
 	cfg.Path = "testdata/nop/main.wasm"
 	ctx := t.Context()
-	wasmExp, err := newWasmExporter(ctx, cfg)
+	wasmExp, err := newWasmMetricsExporter(ctx, cfg)
 	if err != nil {
-		t.Fatalf("failed to create wasm exporter: %v", err)
+		t.Fatalf("failed to create wasm metrics exporter: %v", err)
 	}
 
 	// Create test metrics with 1 resource, 1 scope, and 1 metric
@@ -164,9 +164,9 @@ func TestExportLogsWithNopExporter(t *testing.T) {
 	cfg := createDefaultConfig().(*Config)
 	cfg.Path = "testdata/nop/main.wasm"
 	ctx := t.Context()
-	wasmExp, err := newWasmExporter(ctx, cfg)
+	wasmExp, err := newWasmLogsExporter(ctx, cfg)
 	if err != nil {
-		t.Fatalf("failed to create wasm exporter: %v", err)
+		t.Fatalf("failed to create wasm logs exporter: %v", err)
 	}
 
 	// Create test logs with 1 resource, 1 scope, and 1 log record
@@ -190,9 +190,9 @@ func TestExportTracesWithStdoutExporter(t *testing.T) {
 	cfg := createDefaultConfig().(*Config)
 	cfg.Path = "testdata/stdout/main.wasm"
 	ctx := t.Context()
-	wasmExp, err := newWasmExporter(ctx, cfg)
+	wasmExp, err := newWasmTracesExporter(ctx, cfg)
 	if err != nil {
-		t.Fatalf("failed to create wasm exporter: %v", err)
+		t.Fatalf("failed to create wasm traces exporter: %v", err)
 	}
 
 	// Create test traces with 1 resource, 1 scope, and 1 span
@@ -217,9 +217,9 @@ func TestExportMetricsWithStdoutExporter(t *testing.T) {
 	cfg := createDefaultConfig().(*Config)
 	cfg.Path = "testdata/stdout/main.wasm"
 	ctx := t.Context()
-	wasmExp, err := newWasmExporter(ctx, cfg)
+	wasmExp, err := newWasmMetricsExporter(ctx, cfg)
 	if err != nil {
-		t.Fatalf("failed to create wasm exporter: %v", err)
+		t.Fatalf("failed to create wasm metrics exporter: %v", err)
 	}
 
 	// Create test metrics with 1 resource, 1 scope, and 1 metric
@@ -243,9 +243,9 @@ func TestExportLogsWithStdoutExporter(t *testing.T) {
 	cfg := createDefaultConfig().(*Config)
 	cfg.Path = "testdata/stdout/main.wasm"
 	ctx := t.Context()
-	wasmExp, err := newWasmExporter(ctx, cfg)
+	wasmExp, err := newWasmLogsExporter(ctx, cfg)
 	if err != nil {
-		t.Fatalf("failed to create wasm exporter: %v", err)
+		t.Fatalf("failed to create wasm logs exporter: %v", err)
 	}
 
 	// Create test logs with 1 resource, 1 scope, and 1 log record
@@ -278,7 +278,7 @@ func TestShutdown(t *testing.T) {
 	cfg := createDefaultConfig().(*Config)
 	cfg.Path = "testdata/nop/main.wasm"
 	ctx := t.Context()
-	wasmExp, err := newWasmExporter(ctx, cfg)
+	wasmExp, err := newWasmTracesExporter(ctx, cfg)
 	if err != nil {
 		t.Fatalf("failed to create wasm exporter: %v", err)
 	}
