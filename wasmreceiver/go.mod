@@ -10,6 +10,7 @@ require (
 	go.opentelemetry.io/collector/consumer v1.30.0
 	go.opentelemetry.io/collector/consumer/consumertest v0.124.0
 	go.opentelemetry.io/collector/pdata v1.30.0
+	go.opentelemetry.io/collector/pipeline v0.124.0
 	go.opentelemetry.io/collector/receiver v1.30.0
 	go.opentelemetry.io/collector/receiver/receivertest v0.124.0
 	go.uber.org/zap v1.27.0
@@ -71,7 +72,6 @@ require (
 	go.opentelemetry.io/collector/featuregate v1.30.0 // indirect
 	go.opentelemetry.io/collector/internal/telemetry v0.124.0 // indirect
 	go.opentelemetry.io/collector/pdata/pprofile v0.124.0 // indirect
-	go.opentelemetry.io/collector/pipeline v0.124.0 // indirect
 	go.opentelemetry.io/collector/receiver/xreceiver v0.124.0 // indirect
 	go.opentelemetry.io/contrib/bridges/otelzap v0.10.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.49.0 // indirect
