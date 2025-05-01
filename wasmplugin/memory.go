@@ -7,6 +7,9 @@ import (
 	"go.opentelemetry.io/collector/pdata/ptrace"
 )
 
+// These utility functions are derived from the kube-scheduler-wasm-extension.
+// https://github.com/kubernetes-sigs/kube-scheduler-wasm-extension
+
 // writeBytesIfUnderLimit writes bytes to memory if they fit within the limit
 func writeBytesIfUnderLimit(memory api.Memory, bytes []byte, buf, bufLimit uint32) uint32 {
 	if uint32(len(bytes)) > bufLimit {
@@ -46,9 +49,4 @@ func marshalLogsIfUnderLimit(memory api.Memory, logs plog.Logs, buf, bufLimit ui
 		return 0
 	}
 	return writeBytesIfUnderLimit(memory, logsBytes, buf, bufLimit)
-}
-
-// bufLimit safely retrieves a uint32 buffer limit value from a uint64
-func bufLimit(raw uint64) uint32 {
-	return uint32(raw)
 }

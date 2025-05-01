@@ -4,12 +4,12 @@ go 1.24.0
 
 require (
 	github.com/musaprg/otelwasm/wasmplugin v0.0.0-00010101000000-000000000000
-	github.com/tetratelabs/wazero v1.9.0
 	go.opentelemetry.io/collector/component v1.29.0
 	go.opentelemetry.io/collector/component/componenttest v0.123.0
 	go.opentelemetry.io/collector/consumer v1.29.0
 	go.opentelemetry.io/collector/consumer/consumertest v0.123.0
 	go.opentelemetry.io/collector/pdata v1.29.0
+	go.opentelemetry.io/collector/pipeline v0.123.0
 	go.opentelemetry.io/collector/processor v1.29.0
 	go.opentelemetry.io/collector/processor/processorhelper v0.123.0
 	go.opentelemetry.io/collector/processor/processortest v0.123.0
@@ -29,6 +29,7 @@ require (
 	github.com/stealthrocket/wasi-go v0.8.0 // indirect
 	github.com/stealthrocket/wazergo v0.19.1 // indirect
 	github.com/stretchr/testify v1.10.0 // indirect
+	github.com/tetratelabs/wazero v1.9.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/collector/component/componentstatus v0.123.0 // indirect
 	go.opentelemetry.io/collector/consumer/xconsumer v0.123.0 // indirect
@@ -36,7 +37,6 @@ require (
 	go.opentelemetry.io/collector/internal/telemetry v0.123.0 // indirect
 	go.opentelemetry.io/collector/pdata/pprofile v0.123.0 // indirect
 	go.opentelemetry.io/collector/pdata/testdata v0.123.0 // indirect
-	go.opentelemetry.io/collector/pipeline v0.123.0 // indirect
 	go.opentelemetry.io/collector/processor/xprocessor v0.123.0 // indirect
 	go.opentelemetry.io/contrib/bridges/otelzap v0.10.0 // indirect
 	go.opentelemetry.io/otel v1.35.0 // indirect

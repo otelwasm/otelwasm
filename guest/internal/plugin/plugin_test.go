@@ -13,6 +13,8 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+// This code base is derived from the kube-scheduler-wasm-extension.
+// https://github.com/kubernetes-sigs/kube-scheduler-wasm-extensionx
 
 package plugin
 
