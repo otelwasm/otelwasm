@@ -1,5 +1,9 @@
 # OTelWasm
 
+Project Status: **Experimental**
+
+This project is a PoC for a WebAssembly (Wasm) based OpenTelemetry Collector plugins. It is not intended for production use, and it may include breaking changes without notice.
+
 ## Acknowledgements
 
 This project originally started by Anuraag (Rag) Agrawal (@anuraaga). Most of the code and design is based on [his prior work](https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/11772).
