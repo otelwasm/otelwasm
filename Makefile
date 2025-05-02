@@ -26,27 +26,35 @@ test: copy-wasm-examples
 	@(cd wasmreceiver; go test -v -tags docker ./...)
 	@(cd guest; go test -v -tags docker ./...)
 
+.PHONY: examples/processor/nop/main.wasm
 examples/processor/nop/main.wasm: examples/processor/nop/main.go
 	@(cd $(@D); go run $(wasibuilder) go build -buildmode=c-shared -o main.wasm ./...)
 
+.PHONY: examples/processor/add_new_attribute/main.wasm
 examples/processor/add_new_attribute/main.wasm: examples/processor/add_new_attribute/main.go
 	@(cd $(@D); go run $(wasibuilder) go build -buildmode=c-shared -o main.wasm ./...)
 
+.PHONY: examples/processor/curl/main.wasm
 examples/processor/curl/main.wasm: examples/processor/curl/main.go
 	@(cd $(@D); go run $(wasibuilder) go build -buildmode=c-shared -o main.wasm ./...)
 
+.PHONY: examples/exporter/nop/main.wasm
 examples/exporter/nop/main.wasm: examples/exporter/nop/main.go
 	@(cd $(@D); go run $(wasibuilder) go build -buildmode=c-shared -o main.wasm ./...)
 
+.PHONY: examples/exporter/stdout/main.wasm
 examples/exporter/stdout/main.wasm: examples/exporter/stdout/main.go
 	@(cd $(@D); go run $(wasibuilder) go build -buildmode=c-shared -o main.wasm ./...)
 
+.PHONY: examples/receiver/nop/main.wasm
 examples/receiver/nop/main.wasm: examples/receiver/nop/main.go
 	@(cd $(@D); go run $(wasibuilder) go build -buildmode=c-shared -o main.wasm ./...)
 
+.PHONY: examples/receiver/webhookeventreceiver/main.wasm
 examples/receiver/webhookeventreceiver/main.wasm: examples/receiver/webhookeventreceiver/main.go
 	@(cd $(@D); go run $(wasibuilder) go build -buildmode=c-shared -o main.wasm main.go)
 
+.PHONY: examples/receiver/awss3receiver/main.wasm
 examples/receiver/awss3receiver/main.wasm: examples/receiver/awss3receiver/main.go
 	@(cd $(@D); go run $(wasibuilder) go build -buildmode=c-shared -o main.wasm main.go)
 
