@@ -46,8 +46,7 @@ examples/receiver/nop/main.wasm: examples/receiver/nop/main.go
 	@(cd $(@D); GOOS=wasip1 GOARCH=wasm go build -buildmode=c-shared -o main.wasm ./...)
 
 examples/receiver/webhookeventreceiver/main.wasm: examples/receiver/webhookeventreceiver/main.go
-	# getaddrinfo buildtag is necessary to use sock_getaddrinfo for name resolution
-	@(cd $(@D); GOOS=wasip1 GOARCH=wasm go build -buildmode=c-shared -tags="getaddrinfo" -o main.wasm main.go)
+	@(cd $(@D); go run $(wasibuilder) go build -buildmode=c-shared -tags="getaddrinfo" -o main.wasm main.go)
 
 examples/receiver/awss3receiver/main.wasm: examples/receiver/awss3receiver/main.go
 	@(cd $(@D); go run $(wasibuilder) go build -buildmode=c-shared -o main.wasm main.go)

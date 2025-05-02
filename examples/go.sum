@@ -99,8 +99,8 @@ github.com/open-telemetry/opentelemetry-collector-contrib/extension/opampcustomm
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/opampcustommessages v0.125.0/go.mod h1:/SCCDiWyHB6VllNAhxQZYY4evij2Qf7YJXdLWTXMKEk=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awss3receiver v0.125.0 h1:sujyPARpcb+mPRhFrCFmqaDJok9/Y2zSHqz3DcTc6XM=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awss3receiver v0.125.0/go.mod h1:QRrBitq8si/Y9B2yXPvi4YYbDUz8tQeVhaqxPv2yX50=
-github.com/otelwasm/otelwasm/guest v0.0.0-20250502094859-2f83a0a242fb h1:7ED10x5Y6lTLapefXD1JWmj+5AW4e+Ww85lJRFQzr2M=
-github.com/otelwasm/otelwasm/guest v0.0.0-20250502094859-2f83a0a242fb/go.mod h1:lxj/vs6OIv+ugA5+GmILVXPSUv1pRBMweE2IWuIXAKo=
+github.com/open-telemetry/opentelemetry-collector-contrib/receiver/webhookeventreceiver v0.125.0 h1:Tsj5kMm68ReYevudVzT78koN1peGSlXOvz5SYmT/1Kk=
+github.com/open-telemetry/opentelemetry-collector-contrib/receiver/webhookeventreceiver v0.125.0/go.mod h1:G6u0DTDARvOf2IDRbBoSy+r2eahJwvdMX45Kw0EU+3A=
 github.com/pierrec/lz4/v4 v4.1.22 h1:cKFw6uJDK+/gfw5BcDL0JL5aBsAFdsIT18eRtLj7VIU=
 github.com/pierrec/lz4/v4 v4.1.22/go.mod h1:gZWDp/Ze/IJXGXf23ltt2EXimqmTUXEy0GFuRQyBid4=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
