@@ -4,7 +4,7 @@
 gofumpt       := mvdan.cc/gofumpt@v0.5.0
 gosimports    := github.com/rinchsan/gosimports/cmd/gosimports@v0.3.8
 golangci_lint := github.com/golangci/golangci-lint/cmd/golangci-lint@v1.61.0
-wasibuilder   := github.com/otelwasm/wasibuilder@v0.0.2
+wasibuilder   := github.com/otelwasm/wasibuilder@v0.0.3
 
 # Function to execute a command. Note the empty line before endef to make sure each command
 # gets executed separately instead of concatenated with previous one.
