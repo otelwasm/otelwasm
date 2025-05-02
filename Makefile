@@ -4,6 +4,7 @@
 gofumpt       := mvdan.cc/gofumpt@v0.5.0
 gosimports    := github.com/rinchsan/gosimports/cmd/gosimports@v0.3.8
 golangci_lint := github.com/golangci/golangci-lint/cmd/golangci-lint@v1.61.0
+wasibuilder   := github.com/tsuzu/wasibuilder@v0.0.1
 
 # Function to execute a command. Note the empty line before endef to make sure each command
 # gets executed separately instead of concatenated with previous one.
@@ -50,7 +51,7 @@ examples/receiver/webhookeventreceiver/main.wasm: examples/receiver/webhookevent
 
 examples/receiver/awss3receiver/main.wasm: examples/receiver/awss3receiver/main.go
 	# getaddrinfo buildtag is necessary to use sock_getaddrinfo for name resolution
-	@(cd $(@D); GOOS=wasip1 GOARCH=wasm go build -buildmode=c-shared -tags="getaddrinfo" -o main.wasm main.go)
+	@(cd $(@D); go run $(wasibuilder) go build -buildmode=c-shared -o main.wasm main.go)
 
 .PHONY: build-wasm-examples
 build-wasm-examples: examples/processor/nop/main.wasm examples/processor/add_new_attribute/main.wasm examples/processor/curl/main.wasm examples/exporter/nop/main.wasm examples/exporter/stdout/main.wasm examples/receiver/nop/main.wasm examples/receiver/webhookeventreceiver/main.wasm examples/receiver/awss3receiver/main.wasm
