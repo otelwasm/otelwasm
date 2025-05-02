@@ -1,9 +1,9 @@
-module github.com/musaprg/otelwasm/wasmprocessor
+module github.com/otelwasm/otelwasm/wasmprocessor
 
 go 1.24.0
 
 require (
-	github.com/musaprg/otelwasm/wasmplugin v0.0.0-00010101000000-000000000000
+	github.com/otelwasm/otelwasm/wasmplugin v0.0.0-00010101000000-000000000000
 	go.opentelemetry.io/collector/component v1.29.0
 	go.opentelemetry.io/collector/component/componenttest v0.123.0
 	go.opentelemetry.io/collector/consumer v1.29.0
@@ -56,4 +56,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/musaprg/otelwasm/wasmplugin => ../wasmplugin
+replace github.com/otelwasm/otelwasm/wasmplugin => ../wasmplugin

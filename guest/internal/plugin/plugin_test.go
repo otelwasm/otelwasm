@@ -21,7 +21,7 @@ package plugin
 import (
 	"testing"
 
-	"github.com/musaprg/otelwasm/guest/api"
+	"github.com/otelwasm/otelwasm/guest/api"
 )
 
 type valPlugin string

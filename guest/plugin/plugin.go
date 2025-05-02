@@ -1,16 +1,16 @@
 package plugin
 
 import (
-	"github.com/musaprg/otelwasm/guest/api"
-	"github.com/musaprg/otelwasm/guest/logsexporter"
-	"github.com/musaprg/otelwasm/guest/logsprocessor"
-	"github.com/musaprg/otelwasm/guest/logsreceiver"
-	"github.com/musaprg/otelwasm/guest/metricsexporter"
-	"github.com/musaprg/otelwasm/guest/metricsprocessor"
-	"github.com/musaprg/otelwasm/guest/metricsreceiver"
-	"github.com/musaprg/otelwasm/guest/tracesexporter"
-	"github.com/musaprg/otelwasm/guest/tracesprocessor"
-	"github.com/musaprg/otelwasm/guest/tracesreceiver"
+	"github.com/otelwasm/otelwasm/guest/api"
+	"github.com/otelwasm/otelwasm/guest/logsexporter"
+	"github.com/otelwasm/otelwasm/guest/logsprocessor"
+	"github.com/otelwasm/otelwasm/guest/logsreceiver"
+	"github.com/otelwasm/otelwasm/guest/metricsexporter"
+	"github.com/otelwasm/otelwasm/guest/metricsprocessor"
+	"github.com/otelwasm/otelwasm/guest/metricsreceiver"
+	"github.com/otelwasm/otelwasm/guest/tracesexporter"
+	"github.com/otelwasm/otelwasm/guest/tracesprocessor"
+	"github.com/otelwasm/otelwasm/guest/tracesreceiver"
 )
 
 func Set(plugin api.Plugin) {

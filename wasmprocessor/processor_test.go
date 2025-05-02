@@ -3,7 +3,7 @@ package wasmprocessor
 import (
 	"testing"
 
-	"github.com/musaprg/otelwasm/wasmplugin"
+	"github.com/otelwasm/otelwasm/wasmplugin"
 	"go.opentelemetry.io/collector/component/componenttest"
 	"go.opentelemetry.io/collector/consumer/consumertest"
 	"go.opentelemetry.io/collector/pdata/plog"

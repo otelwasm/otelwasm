@@ -1,6 +1,6 @@
 package wasmreceiver
 
-import "github.com/musaprg/otelwasm/wasmplugin"
+import "github.com/otelwasm/otelwasm/wasmplugin"
 
 type Config struct {
 	wasmplugin.Config `mapstructure:",squash"`

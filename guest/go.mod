@@ -1,4 +1,4 @@
-module github.com/musaprg/otelwasm/guest
+module github.com/otelwasm/otelwasm/guest
 
 go 1.24.0
 

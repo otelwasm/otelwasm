@@ -3,10 +3,10 @@ package main
 import (
 	"context"
 
-	"github.com/musaprg/otelwasm/examples/receiver/webhookeventreceiver/webhookeventreceiver"
-	"github.com/musaprg/otelwasm/guest/api"
-	otelwasm "github.com/musaprg/otelwasm/guest/imports"
-	"github.com/musaprg/otelwasm/guest/plugin" // register receivers
+	"github.com/otelwasm/otelwasm/examples/receiver/webhookeventreceiver/webhookeventreceiver"
+	"github.com/otelwasm/otelwasm/guest/api"
+	otelwasm "github.com/otelwasm/otelwasm/guest/imports"
+	"github.com/otelwasm/otelwasm/guest/plugin" // register receivers
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/consumer"
 	"go.opentelemetry.io/collector/pdata/plog"

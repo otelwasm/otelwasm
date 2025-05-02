@@ -4,10 +4,10 @@ import (
 	"context"
 
 	"github.com/go-viper/mapstructure/v2"
-	"github.com/musaprg/otelwasm/guest/api"
-	"github.com/musaprg/otelwasm/guest/imports"
-	"github.com/musaprg/otelwasm/guest/plugin" // register receivers
 	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awss3receiver"
+	"github.com/otelwasm/otelwasm/guest/api"
+	"github.com/otelwasm/otelwasm/guest/imports"
+	"github.com/otelwasm/otelwasm/guest/plugin" // register receivers
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/component/componenttest"
 	"go.opentelemetry.io/collector/consumer"

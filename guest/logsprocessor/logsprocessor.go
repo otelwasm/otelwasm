@@ -3,10 +3,10 @@ package logsprocessor
 import (
 	"runtime"
 
-	"github.com/musaprg/otelwasm/guest/api"
-	pubimports "github.com/musaprg/otelwasm/guest/imports"
-	"github.com/musaprg/otelwasm/guest/internal/imports"
-	"github.com/musaprg/otelwasm/guest/internal/plugin"
+	"github.com/otelwasm/otelwasm/guest/api"
+	pubimports "github.com/otelwasm/otelwasm/guest/imports"
+	"github.com/otelwasm/otelwasm/guest/internal/imports"
+	"github.com/otelwasm/otelwasm/guest/internal/plugin"
 )
 
 var logsprocessor api.LogsProcessor

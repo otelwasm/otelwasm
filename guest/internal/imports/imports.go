@@ -2,7 +2,7 @@
 
 package imports
 
-import "github.com/musaprg/otelwasm/guest/internal/mem"
+import "github.com/otelwasm/otelwasm/guest/internal/mem"
 
 //go:wasmimport opentelemetry.io/wasm currentTraces
 func currentTraces(ptr uint32, limit mem.BufLimit) (len uint32)

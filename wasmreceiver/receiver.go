@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/musaprg/otelwasm/wasmplugin"
+	"github.com/otelwasm/otelwasm/wasmplugin"
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/consumer"
 	"go.opentelemetry.io/collector/pdata/plog"

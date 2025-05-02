@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/musaprg/otelwasm/wasmplugin"
+	"github.com/otelwasm/otelwasm/wasmplugin"
 	"go.opentelemetry.io/collector/pdata/plog"
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.opentelemetry.io/collector/pdata/ptrace"

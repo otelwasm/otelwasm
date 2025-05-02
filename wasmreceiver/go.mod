@@ -1,10 +1,10 @@
-module github.com/musaprg/otelwasm/wasmreceiver
+module github.com/otelwasm/otelwasm/wasmreceiver
 
 go 1.24.0
 
 require (
 	github.com/docker/docker v28.1.1+incompatible
-	github.com/musaprg/otelwasm/wasmplugin v0.0.0-00010101000000-000000000000
+	github.com/otelwasm/otelwasm/wasmplugin v0.0.0-00010101000000-000000000000
 	github.com/testcontainers/testcontainers-go v0.37.0
 	go.opentelemetry.io/collector/component v1.30.0
 	go.opentelemetry.io/collector/consumer v1.30.0
@@ -94,4 +94,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/musaprg/otelwasm/wasmplugin => ../wasmplugin
+replace github.com/otelwasm/otelwasm/wasmplugin => ../wasmplugin
