@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awss3receiver"
+	"github.com/otelwasm/otelwasm/guest/api"
 	"github.com/otelwasm/otelwasm/guest/factoryconnector"
 	"github.com/otelwasm/otelwasm/guest/plugin" // register receivers
 	"go.opentelemetry.io/collector/component"
@@ -28,8 +29,14 @@ func init() {
 
 	connector := factoryconnector.NewReceiverConnector(factory, settings)
 
-	plugin.Set(connector.Metrics())
-	plugin.Set(connector.Logs())
-	plugin.Set(connector.Traces())
+	plugin.Set(struct {
+		api.MetricsReceiver
+		api.LogsReceiver
+		api.TracesReceiver
+	}{
+		connector.Metrics(),
+		connector.Logs(),
+		connector.Traces(),
+	})
 }
 func main() {}
