@@ -8,7 +8,6 @@ import (
 	"github.com/musaprg/otelwasm/guest/imports"
 	"github.com/musaprg/otelwasm/guest/plugin" // register receivers
 	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awss3receiver"
-	_ "github.com/stealthrocket/net/http"
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/component/componenttest"
 	"go.opentelemetry.io/collector/consumer"
