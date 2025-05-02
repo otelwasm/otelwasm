@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 
-	"github.com/musaprg/otelwasm/guest/api"
-	"github.com/musaprg/otelwasm/guest/plugin" // register receivers
+	"github.com/otelwasm/otelwasm/guest/api"
+	"github.com/otelwasm/otelwasm/guest/plugin" // register receivers
 )
 
 func init() {

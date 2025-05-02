@@ -3,9 +3,9 @@ package main
 import (
 	"fmt"
 
-	"github.com/musaprg/otelwasm/guest/api"
-	"github.com/musaprg/otelwasm/guest/imports"
-	"github.com/musaprg/otelwasm/guest/plugin" // register tracesprocessor
+	"github.com/otelwasm/otelwasm/guest/api"
+	"github.com/otelwasm/otelwasm/guest/imports"
+	"github.com/otelwasm/otelwasm/guest/plugin" // register tracesprocessor
 	"go.opentelemetry.io/collector/pdata/ptrace"
 )
 

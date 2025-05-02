@@ -1,4 +1,4 @@
-module github.com/musaprg/otelwasm/wasmplugin
+module github.com/otelwasm/otelwasm/wasmplugin
 
 go 1.24.0
 

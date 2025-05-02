@@ -2,7 +2,7 @@
 
 package imports
 
-import "github.com/musaprg/otelwasm/guest/internal/mem"
+import "github.com/otelwasm/otelwasm/guest/internal/mem"
 
 // This file is used to stub out the imports for running tests.
 

@@ -1,4 +1,4 @@
-module github.com/musaprg/otelwasm/examples
+module github.com/otelwasm/otelwasm/examples
 
 go 1.24.0
 
@@ -9,7 +9,7 @@ require (
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/klauspost/compress v1.18.0
 	github.com/musaprg/dispatchrunnet v0.3.0-rc.2
-	github.com/musaprg/otelwasm/guest v0.0.0-20250423153004-df6916a9db1c
+	github.com/otelwasm/otelwasm/guest v0.0.0-20250423153004-df6916a9db1c
 	github.com/open-telemetry/opamp-go v0.19.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/opampcustommessages v0.125.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awss3receiver v0.125.0

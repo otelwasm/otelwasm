@@ -22,7 +22,7 @@ package plugin
 import (
 	"reflect"
 
-	"github.com/musaprg/otelwasm/guest/api"
+	"github.com/otelwasm/otelwasm/guest/api"
 )
 
 var current api.Plugin

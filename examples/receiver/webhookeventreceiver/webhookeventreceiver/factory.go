@@ -4,7 +4,7 @@
 package webhookeventreceiver // import "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/webhookeventreceiver"
 
 import (
-	"github.com/musaprg/otelwasm/examples/receiver/webhookeventreceiver/webhookeventreceiver/metadata"
+	"github.com/otelwasm/otelwasm/examples/receiver/webhookeventreceiver/webhookeventreceiver/metadata"
 	"go.opentelemetry.io/collector/component"
 )
 

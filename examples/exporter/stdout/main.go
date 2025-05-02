@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 
-	"github.com/musaprg/otelwasm/guest/api"
-	"github.com/musaprg/otelwasm/guest/plugin" // register tracesexporter, metricsexporter, logsexporter
+	"github.com/otelwasm/otelwasm/guest/api"
+	"github.com/otelwasm/otelwasm/guest/plugin" // register tracesexporter, metricsexporter, logsexporter
 	"go.opentelemetry.io/collector/pdata/plog"
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.opentelemetry.io/collector/pdata/ptrace"

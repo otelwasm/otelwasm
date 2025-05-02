@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/musaprg/otelwasm/guest/api"
-	"github.com/musaprg/otelwasm/guest/internal/imports"
-	"github.com/musaprg/otelwasm/guest/internal/plugin"
+	"github.com/otelwasm/otelwasm/guest/api"
+	"github.com/otelwasm/otelwasm/guest/internal/imports"
+	"github.com/otelwasm/otelwasm/guest/internal/plugin"
 )
 
 var logsreceiver api.LogsReceiver

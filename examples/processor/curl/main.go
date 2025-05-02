@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/musaprg/otelwasm/guest/api"
-	"github.com/musaprg/otelwasm/guest/plugin" // register tracesprocessor
-	"github.com/stealthrocket/net/wasip1"      // for wasip1 dialer
+	"github.com/otelwasm/otelwasm/guest/api"
+	"github.com/otelwasm/otelwasm/guest/plugin" // register tracesprocessor
+	"github.com/stealthrocket/net/wasip1"       // for wasip1 dialer
 	"go.opentelemetry.io/collector/pdata/plog"
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.opentelemetry.io/collector/pdata/ptrace"
