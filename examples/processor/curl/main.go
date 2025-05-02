@@ -7,7 +7,6 @@ import (
 
 	"github.com/otelwasm/otelwasm/guest/api"
 	"github.com/otelwasm/otelwasm/guest/plugin" // register tracesprocessor
-	"github.com/stealthrocket/net/wasip1"       // for wasip1 dialer
 	"go.opentelemetry.io/collector/pdata/plog"
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.opentelemetry.io/collector/pdata/ptrace"
@@ -24,15 +23,7 @@ var (
 	_ api.LogsProcessor    = (*CurlProcessor)(nil)
 )
 
-// Create a custom http client that uses stealthrocket's net implementation
 var httpClient = &http.Client{
-	Transport: &http.Transport{
-		// Use wasip1's DialContext for WASI socket compatibility
-		DialContext: wasip1.DialContext,
-		// Add reasonable timeouts
-		ResponseHeaderTimeout: 30 * time.Second,
-		ExpectContinueTimeout: 5 * time.Second,
-	},
 	Timeout: 60 * time.Second,
 }
 

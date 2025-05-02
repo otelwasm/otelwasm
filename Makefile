@@ -4,7 +4,7 @@
 gofumpt       := mvdan.cc/gofumpt@v0.5.0
 gosimports    := github.com/rinchsan/gosimports/cmd/gosimports@v0.3.8
 golangci_lint := github.com/golangci/golangci-lint/cmd/golangci-lint@v1.61.0
-wasibuilder   := github.com/otelwasm/wasibuilder@v0.0.3
+wasibuilder   := github.com/otelwasm/wasibuilder@v0.0.6
 
 # Function to execute a command. Note the empty line before endef to make sure each command
 # gets executed separately instead of concatenated with previous one.
@@ -20,34 +20,41 @@ format:
 	@go run $(gosimports) -w $(shell find . -name '*.go' -type f)
 
 .PHONY: test
-test:
+test: copy-wasm-examples
 	@(cd wasmprocessor; go test -v -tags docker ./...)
 	@(cd wasmexporter; go test -v -tags docker ./...)
 	@(cd wasmreceiver; go test -v -tags docker ./...)
 	@(cd guest; go test -v -tags docker ./...)
 
+.PHONY: examples/processor/nop/main.wasm
 examples/processor/nop/main.wasm: examples/processor/nop/main.go
-	@(cd $(@D); GOOS=wasip1 GOARCH=wasm go build -buildmode=c-shared -o main.wasm ./...)
+	@(cd $(@D); go run $(wasibuilder) go build -buildmode=c-shared -o main.wasm ./...)
 
+.PHONY: examples/processor/add_new_attribute/main.wasm
 examples/processor/add_new_attribute/main.wasm: examples/processor/add_new_attribute/main.go
-	@(cd $(@D); GOOS=wasip1 GOARCH=wasm go build -buildmode=c-shared -o main.wasm ./...)
+	@(cd $(@D); go run $(wasibuilder) go build -buildmode=c-shared -o main.wasm ./...)
 
+.PHONY: examples/processor/curl/main.wasm
 examples/processor/curl/main.wasm: examples/processor/curl/main.go
-	# getaddrinfo buildtag is necessary to use sock_getaddrinfo for name resolution
-	@(cd $(@D); GOOS=wasip1 GOARCH=wasm go build -buildmode=c-shared -tags="getaddrinfo" -o main.wasm ./...)
+	@(cd $(@D); go run $(wasibuilder) go build -buildmode=c-shared -o main.wasm ./...)
 
+.PHONY: examples/exporter/nop/main.wasm
 examples/exporter/nop/main.wasm: examples/exporter/nop/main.go
-	@(cd $(@D); GOOS=wasip1 GOARCH=wasm go build -buildmode=c-shared -o main.wasm ./...)
+	@(cd $(@D); go run $(wasibuilder) go build -buildmode=c-shared -o main.wasm ./...)
 
+.PHONY: examples/exporter/stdout/main.wasm
 examples/exporter/stdout/main.wasm: examples/exporter/stdout/main.go
-	@(cd $(@D); GOOS=wasip1 GOARCH=wasm go build -buildmode=c-shared -o main.wasm ./...)
+	@(cd $(@D); go run $(wasibuilder) go build -buildmode=c-shared -o main.wasm ./...)
 
+.PHONY: examples/receiver/nop/main.wasm
 examples/receiver/nop/main.wasm: examples/receiver/nop/main.go
-	@(cd $(@D); GOOS=wasip1 GOARCH=wasm go build -buildmode=c-shared -o main.wasm ./...)
+	@(cd $(@D); go run $(wasibuilder) go build -buildmode=c-shared -o main.wasm ./...)
 
+.PHONY: examples/receiver/webhookeventreceiver/main.wasm
 examples/receiver/webhookeventreceiver/main.wasm: examples/receiver/webhookeventreceiver/main.go
-	@(cd $(@D); go run $(wasibuilder) go build -buildmode=c-shared -tags="getaddrinfo" -o main.wasm main.go)
+	@(cd $(@D); go run $(wasibuilder) go build -buildmode=c-shared -o main.wasm main.go)
 
+.PHONY: examples/receiver/awss3receiver/main.wasm
 examples/receiver/awss3receiver/main.wasm: examples/receiver/awss3receiver/main.go
 	@(cd $(@D); go run $(wasibuilder) go build -buildmode=c-shared -o main.wasm main.go)
 
