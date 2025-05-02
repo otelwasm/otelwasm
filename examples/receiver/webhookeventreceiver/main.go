@@ -1,64 +1,42 @@
 package main
 
 import (
-	"context"
-
-	"github.com/otelwasm/otelwasm/examples/receiver/webhookeventreceiver/webhookeventreceiver"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/webhookeventreceiver"
 	"github.com/otelwasm/otelwasm/guest/api"
-	otelwasm "github.com/otelwasm/otelwasm/guest/imports"
+	"github.com/otelwasm/otelwasm/guest/factoryconnector"
 	"github.com/otelwasm/otelwasm/guest/plugin" // register receivers
 	"go.opentelemetry.io/collector/component"
-	"go.opentelemetry.io/collector/consumer"
-	"go.opentelemetry.io/collector/pdata/plog"
+	"go.opentelemetry.io/collector/component/componenttest"
+	"go.opentelemetry.io/collector/receiver"
+	"go.uber.org/zap"
 )
 
 func init() {
-	println("registering webhookeventreceiver")
-	plugin.Set(&WebhookEventReceiver{})
-}
-func main() {}
-
-var _ api.LogsReceiver = (*WebhookEventReceiver)(nil)
-
-type logConsumer struct{}
-
-// Capabilities implements consumer.Logs.
-func (c *logConsumer) Capabilities() consumer.Capabilities {
-	return consumer.Capabilities{MutatesData: false}
-}
-
-var _ consumer.Logs = (*logConsumer)(nil)
-
-func (c *logConsumer) ConsumeLogs(ctx context.Context, logs plog.Logs) error {
-	otelwasm.SetResultLogs(logs)
-	return nil
-}
-
-type host struct{}
-
-func (h *host) GetExtensions() map[component.ID]component.Component {
-	return nil
-}
-
-type WebhookEventReceiver struct{}
-
-// StartLogs implements api.LogsReceiver.
-func (n *WebhookEventReceiver) StartLogs(ctx context.Context) {
-	println("called startlogs")
-
-	cfg := webhookeventreceiver.CreateDefaultConfig().(*webhookeventreceiver.Config)
-	cfg.Endpoint = "127.0.0.1:8088"
-	csm := &logConsumer{}
-	lr, err := webhookeventreceiver.NewLogsReceiver(*cfg, csm)
+	logger, err := zap.NewProduction()
 	if err != nil {
 		panic(err)
 	}
 
-	println("initialization completed")
+	factory := webhookeventreceiver.NewFactory()
+	telemetrySettings := componenttest.NewNopTelemetrySettings()
+	telemetrySettings.Logger = logger
 
-	if err := lr.Start(ctx, &host{}); err != nil {
-		panic(err)
+	settings := receiver.Settings{
+		ID:                component.MustNewID("awss3"),
+		TelemetrySettings: telemetrySettings,
+		BuildInfo:         component.NewDefaultBuildInfo(),
 	}
-	<-ctx.Done()
-	println("stopping receiver")
+
+	connector := factoryconnector.NewReceiverConnector(factory, settings)
+
+	plugin.Set(struct {
+		api.MetricsReceiver
+		api.LogsReceiver
+		api.TracesReceiver
+	}{
+		connector.Metrics(),
+		connector.Logs(),
+		connector.Traces(),
+	})
 }
+func main() {}

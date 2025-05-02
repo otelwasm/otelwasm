@@ -9,6 +9,7 @@ require (
 	github.com/klauspost/compress v1.18.0
 	github.com/musaprg/dispatchrunnet v0.3.0-rc.2
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awss3receiver v0.125.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/webhookeventreceiver v0.125.0
 	github.com/otelwasm/otelwasm/guest v0.0.0
 	github.com/pierrec/lz4/v4 v4.1.22
 	github.com/rs/cors v1.11.1
