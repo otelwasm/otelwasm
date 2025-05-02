@@ -22,7 +22,7 @@ func init() {
 	telemetrySettings.Logger = logger
 
 	settings := receiver.Settings{
-		ID:                component.MustNewID("awss3"),
+		ID:                component.MustNewID("webhookevent"),
 		TelemetrySettings: telemetrySettings,
 		BuildInfo:         component.NewDefaultBuildInfo(),
 	}
@@ -30,13 +30,9 @@ func init() {
 	connector := factoryconnector.NewReceiverConnector(factory, settings)
 
 	plugin.Set(struct {
-		api.MetricsReceiver
 		api.LogsReceiver
-		api.TracesReceiver
 	}{
-		connector.Metrics(),
 		connector.Logs(),
-		connector.Traces(),
 	})
 }
 func main() {}
