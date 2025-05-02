@@ -3,7 +3,7 @@ module github.com/otelwasm/otelwasm/wasmexporter
 go 1.24.2
 
 require (
-	github.com/otelwasm/otelwasm/wasmplugin v0.0.0-20250502105233-f228ebeb341f
+	github.com/otelwasm/otelwasm/wasmplugin v0.0.0
 	go.opentelemetry.io/collector/component v1.31.0
 	go.opentelemetry.io/collector/component/componenttest v0.125.0
 	go.opentelemetry.io/collector/consumer v1.31.0
@@ -68,3 +68,5 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
+
+replace github.com/otelwasm/otelwasm/wasmplugin => ../wasmplugin

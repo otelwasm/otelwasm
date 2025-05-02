@@ -10,7 +10,7 @@ require (
 	github.com/klauspost/compress v1.18.0
 	github.com/musaprg/dispatchrunnet v0.3.0-rc.2
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awss3receiver v0.125.0
-	github.com/otelwasm/otelwasm/guest v0.0.0-20250502094859-2f83a0a242fb
+	github.com/otelwasm/otelwasm/guest v0.0.0
 	github.com/pierrec/lz4/v4 v4.1.22
 	github.com/rs/cors v1.11.1
 	github.com/stealthrocket/net v0.2.1
@@ -93,3 +93,5 @@ require (
 	google.golang.org/protobuf v1.36.6 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace github.com/otelwasm/otelwasm/guest => ../guest
