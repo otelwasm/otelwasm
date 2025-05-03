@@ -1,0 +1,41 @@
+dist:
+  module: github.com/otelwasm/otelwasm/cmd/otelwasmcol
+  name: otelwasmcol
+  description: OpenTelemetry Collector distribution with OtelWasm components
+  output_path: ./cmd/otelwasmcol
+
+# --- otelwasm components ---
+
+exporters:
+  - gomod: github.com/otelwasm/otelwasm/wasmexporter v0.0.0
+
+processors:
+  - gomod: github.com/otelwasm/otelwasm/wasmprocessor v0.0.0
+
+receivers:
+  - gomod: github.com/otelwasm/otelwasm/wasmreceiver v0.0.0
+
+# --- end of otelwasm components ---
+
+# The following components are the default components that are included in the OpenTelemetry Collector core distribution.
+
+extensions:
+  - gomod: go.opentelemetry.io/collector/extension/zpagesextension v0.125.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.125.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension v0.125.0
+
+connectors:
+  - gomod: go.opentelemetry.io/collector/connector/forwardconnector v0.125.0
+
+providers:
+  - gomod: go.opentelemetry.io/collector/confmap/provider/envprovider v1.31.0
+  - gomod: go.opentelemetry.io/collector/confmap/provider/fileprovider v1.31.0
+  - gomod: go.opentelemetry.io/collector/confmap/provider/httpprovider v1.31.0
+  - gomod: go.opentelemetry.io/collector/confmap/provider/httpsprovider v1.31.0
+  - gomod: go.opentelemetry.io/collector/confmap/provider/yamlprovider v1.31.0
+
+replaces:
+  - github.com/otelwasm/otelwasm/wasmexporter => ../../wasmexporter
+  - github.com/otelwasm/otelwasm/wasmprocessor => ../../wasmprocessor
+  - github.com/otelwasm/otelwasm/wasmreceiver => ../../wasmreceiver
+  - github.com/otelwasm/otelwasm/wasmplugin => ../../wasmplugin
