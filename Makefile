@@ -8,7 +8,6 @@ SRC_ROOT := $(git rev-parse --show-toplevel)
 
 GOCMD?= go
 GO_BUILD_TAGS=""
-GO_BUILD_LDFLAGS="-s -w"
 GOARCH=$(shell $(GOCMD) env GOARCH)
 GOOS=$(shell $(GOCMD) env GOOS)
 GOTOOL := GOOS="" GOARCH="" $(GOCMD) tool
