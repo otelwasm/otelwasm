@@ -1,8 +1,6 @@
 # Some rules are copied from https://github.com/kubernetes-sigs/kube-scheduler-wasm-extension/blob/main/Makefile
 # Some rules are copied from https://github.com/open-telemetry/opentelemetry-collector/blob/main/Makefile
 
-gofumpt       := mvdan.cc/gofumpt@v0.5.0
-gosimports    := github.com/rinchsan/gosimports/cmd/gosimports@v0.3.8
 golangci_lint := github.com/golangci/golangci-lint/cmd/golangci-lint@v1.61.0
 wasibuilder   := github.com/otelwasm/wasibuilder@v0.0.6
 
@@ -27,8 +25,8 @@ endef
 
 .PHONY: format
 format:
-	@$(GOCMD) run $(gofumpt) -l -w .
-	@$(GOCMD) run $(gosimports) -w $(shell find . -name '*.go' -type f)
+	@$(GOTOOL) gofumpt -l -w .
+	@$(GOTOOL) gosimports -w $(shell find . -name '*.go' -type f)
 
 .PHONY: test
 test: copy-wasm-examples
