@@ -114,8 +114,8 @@ func TestS3Receiver(t *testing.T) {
 	}{
 		{
 			name:         "metrics",
-			inputDir:     "testdata/awss3/testdata/metrics/input/",
-			expectedPath: "testdata/awss3/testdata/metrics/output/metrics.json",
+			inputDir:     "testdata/awss3receiver/testdata/metrics/input/",
+			expectedPath: "testdata/awss3receiver/testdata/metrics/output/metrics.json",
 			prepare: func(t *testing.T, sink *sink) (context.Context, *Receiver) {
 				cfg := createDefaultConfig().(*Config)
 				cfg.PluginConfig = map[string]any{
@@ -131,7 +131,7 @@ func TestS3Receiver(t *testing.T) {
 					},
 				}
 
-				cfg.Path = "testdata/awss3/main.wasm"
+				cfg.Path = "testdata/awss3receiver/main.wasm"
 				ctx := t.Context()
 				settings := receivertest.NewNopSettings(typeStr)
 
@@ -145,8 +145,8 @@ func TestS3Receiver(t *testing.T) {
 		},
 		{
 			name:         "logs",
-			inputDir:     "testdata/awss3/testdata/logs/input/",
-			expectedPath: "testdata/awss3/testdata/logs/output/logs.json",
+			inputDir:     "testdata/awss3receiver/testdata/logs/input/",
+			expectedPath: "testdata/awss3receiver/testdata/logs/output/logs.json",
 			prepare: func(t *testing.T, sink *sink) (context.Context, *Receiver) {
 				cfg := createDefaultConfig().(*Config)
 				cfg.PluginConfig = map[string]any{
@@ -162,7 +162,7 @@ func TestS3Receiver(t *testing.T) {
 					},
 				}
 
-				cfg.Path = "testdata/awss3/main.wasm"
+				cfg.Path = "testdata/awss3receiver/main.wasm"
 				ctx := t.Context()
 				settings := receivertest.NewNopSettings(typeStr)
 
@@ -176,8 +176,8 @@ func TestS3Receiver(t *testing.T) {
 		},
 		{
 			name:         "traces",
-			inputDir:     "testdata/awss3/testdata/traces/input/",
-			expectedPath: "testdata/awss3/testdata/traces/output/traces.json",
+			inputDir:     "testdata/awss3receiver/testdata/traces/input/",
+			expectedPath: "testdata/awss3receiver/testdata/traces/output/traces.json",
 			prepare: func(t *testing.T, sink *sink) (context.Context, *Receiver) {
 				cfg := createDefaultConfig().(*Config)
 				cfg.PluginConfig = map[string]any{
@@ -193,7 +193,7 @@ func TestS3Receiver(t *testing.T) {
 					},
 				}
 
-				cfg.Path = "testdata/awss3/main.wasm"
+				cfg.Path = "testdata/awss3receiver/main.wasm"
 				ctx := t.Context()
 				settings := receivertest.NewNopSettings(typeStr)
 
