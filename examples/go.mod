@@ -14,6 +14,26 @@ require (
 )
 
 require (
+	github.com/knadh/koanf/maps v0.1.2 // indirect
+	github.com/knadh/koanf/providers/confmap v1.0.0 // indirect
+	github.com/knadh/koanf/v2 v2.2.0 // indirect
+	github.com/mitchellh/copystructure v1.2.0 // indirect
+	github.com/mitchellh/reflectwalk v1.0.2 // indirect
+	github.com/mostynb/go-grpc-compression v1.2.3 // indirect
+	go.opentelemetry.io/collector v0.125.0 // indirect
+	go.opentelemetry.io/collector/config/configgrpc v0.125.0 // indirect
+	go.opentelemetry.io/collector/config/confignet v1.31.0 // indirect
+	go.opentelemetry.io/collector/confmap v1.31.0 // indirect
+	go.opentelemetry.io/collector/consumer/consumererror v0.125.0 // indirect
+	go.opentelemetry.io/collector/consumer/xconsumer v0.125.0 // indirect
+	go.opentelemetry.io/collector/internal/sharedcomponent v0.125.0 // indirect
+	go.opentelemetry.io/collector/pdata/pprofile v0.125.0 // indirect
+	go.opentelemetry.io/collector/receiver/xreceiver v0.125.0 // indirect
+	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.60.0 // indirect
+	sigs.k8s.io/yaml v1.4.0 // indirect
+)
+
+require (
 	github.com/aws/aws-sdk-go-v2 v1.36.3 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.6.10 // indirect
 	github.com/aws/aws-sdk-go-v2/config v1.29.14 // indirect
@@ -66,6 +86,7 @@ require (
 	go.opentelemetry.io/collector/featuregate v1.31.0 // indirect
 	go.opentelemetry.io/collector/internal/telemetry v0.125.0 // indirect
 	go.opentelemetry.io/collector/pipeline v0.125.0 // indirect
+	go.opentelemetry.io/collector/receiver/otlpreceiver v0.125.0
 	go.opentelemetry.io/collector/receiver/receiverhelper v0.125.0 // indirect
 	go.opentelemetry.io/contrib/bridges/otelzap v0.10.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.60.0 // indirect
