@@ -8,12 +8,14 @@ require (
 	github.com/otelwasm/otelwasm/guest v0.0.0
 	go.opentelemetry.io/collector/component v1.31.0
 	go.opentelemetry.io/collector/component/componenttest v0.125.0
+	go.opentelemetry.io/collector/exporter v0.125.0
 	go.opentelemetry.io/collector/pdata v1.31.0
 	go.opentelemetry.io/collector/receiver v1.31.0
 	go.uber.org/zap v1.27.0
 )
 
 require (
+	github.com/cenkalti/backoff/v5 v5.0.2 // indirect
 	github.com/knadh/koanf/maps v0.1.2 // indirect
 	github.com/knadh/koanf/providers/confmap v1.0.0 // indirect
 	github.com/knadh/koanf/v2 v2.2.0 // indirect
@@ -23,11 +25,18 @@ require (
 	go.opentelemetry.io/collector v0.125.0 // indirect
 	go.opentelemetry.io/collector/config/configgrpc v0.125.0 // indirect
 	go.opentelemetry.io/collector/config/confignet v1.31.0 // indirect
+	go.opentelemetry.io/collector/config/configretry v1.31.0 // indirect
 	go.opentelemetry.io/collector/confmap v1.31.0 // indirect
 	go.opentelemetry.io/collector/consumer/consumererror v0.125.0 // indirect
+	go.opentelemetry.io/collector/consumer/consumererror/xconsumererror v0.125.0 // indirect
 	go.opentelemetry.io/collector/consumer/xconsumer v0.125.0 // indirect
+	go.opentelemetry.io/collector/exporter/exporterhelper/xexporterhelper v0.125.0 // indirect
+	go.opentelemetry.io/collector/exporter/xexporter v0.125.0 // indirect
+	go.opentelemetry.io/collector/extension v1.31.0 // indirect
+	go.opentelemetry.io/collector/extension/xextension v0.125.0 // indirect
 	go.opentelemetry.io/collector/internal/sharedcomponent v0.125.0 // indirect
 	go.opentelemetry.io/collector/pdata/pprofile v0.125.0 // indirect
+	go.opentelemetry.io/collector/pipeline/xpipeline v0.125.0 // indirect
 	go.opentelemetry.io/collector/receiver/xreceiver v0.125.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.60.0 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
@@ -81,6 +90,7 @@ require (
 	go.opentelemetry.io/collector/config/configopaque v1.31.0 // indirect
 	go.opentelemetry.io/collector/config/configtls v1.31.0 // indirect
 	go.opentelemetry.io/collector/consumer v1.31.0 // indirect
+	go.opentelemetry.io/collector/exporter/otlphttpexporter v0.125.0
 	go.opentelemetry.io/collector/extension/extensionauth v1.31.0 // indirect
 	go.opentelemetry.io/collector/extension/extensionmiddleware v0.125.0 // indirect
 	go.opentelemetry.io/collector/featuregate v1.31.0 // indirect
