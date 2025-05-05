@@ -13,6 +13,7 @@ import (
 
 // TODO: Fix the bug when using the gRPC endpoint.
 // Currently, the gRPC endpoint is not working properly due to the panic while handling the incoming request.
+// For more details, see https://github.com/otelwasm/otelwasm/issues/59
 
 func init() {
 	logger, err := zap.NewProduction()
