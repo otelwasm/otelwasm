@@ -48,6 +48,8 @@ go.opentelemetry.io/collector/consumer/consumertest v0.125.0 h1:TUkxomGS4DAtjBvc
 go.opentelemetry.io/collector/consumer/consumertest v0.125.0/go.mod h1:vkHf3y85cFLDHARO/cTREVjLjOPAV+cQg7lkC44DWOY=
 go.opentelemetry.io/collector/consumer/xconsumer v0.125.0 h1:oTreUlk1KpMSWwuHFnstW+orrjGTyvs2xd3o/Dpy+hI=
 go.opentelemetry.io/collector/consumer/xconsumer v0.125.0/go.mod h1:FX0G37r0W+wXRgxxFtwEJ4rlsCB+p0cIaxtU3C4hskw=
+go.opentelemetry.io/collector/exporter v0.125.0 h1:GJxeCuOQVPndQzvzpZUFEv5njHuVnzBEuXgddRShiCM=
+go.opentelemetry.io/collector/exporter v0.125.0/go.mod h1:x+FFBRxWGk+GGaP7u+Bi+OcZoG5qK5vZmgFwI/t4ZwM=
 go.opentelemetry.io/collector/featuregate v1.31.0 h1:20q7plPQZwmAiaYAa6l1m/i2qDITZuWlhjr4EkmeQls=
 go.opentelemetry.io/collector/featuregate v1.31.0/go.mod h1:Y/KsHbvREENKvvN9RlpiWk/IGBK+CATBYzIIpU7nccc=
 go.opentelemetry.io/collector/internal/telemetry v0.125.0 h1:6lcGOxw3dAg7LfXTKdN8ZjR+l7KvzLdEiPMhhLwG4r4=
