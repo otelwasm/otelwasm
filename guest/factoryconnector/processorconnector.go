@@ -1,4 +1,3 @@
-// filepath: /Users/musaprg/workspace/personal/otelwasm/guest/factoryconnector/processorconnector.go
 package factoryconnector
 
 import (
