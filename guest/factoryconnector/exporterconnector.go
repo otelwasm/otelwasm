@@ -1,4 +1,3 @@
-// filepath: /Users/musaprg/workspace/personal/otelwasm/guest/factoryconnector/exporterconnector.go
 package factoryconnector
 
 import (
@@ -136,7 +135,11 @@ type tracesExporter struct {
 }
 
 func (e *tracesExporter) PushTraces(traces ptrace.Traces) *api.Status {
+	println("Called PushTraces")
+
 	if e.tracesExporter == nil {
+		println("e.tracesExporter is nil, creating a new one")
+
 		e.initConfig()
 		logger := e.settings.Logger
 
@@ -147,6 +150,8 @@ func (e *tracesExporter) PushTraces(traces ptrace.Traces) *api.Status {
 			return api.StatusError(err.Error())
 		}
 
+		println("Starting traces exporter")
+
 		err = e.tracesExporter.Start(context.Background(), componenttest.NewNopHost())
 		if err != nil {
 			logger.Error("failed to start traces exporter", zap.Error(err))
@@ -154,11 +159,22 @@ func (e *tracesExporter) PushTraces(traces ptrace.Traces) *api.Status {
 		}
 	}
 
+	println("Calling ConsumeTraces")
+
+	println("Capabilities: ", e.tracesExporter.Capabilities().MutatesData)
+	println("Traces: ", traces.SpanCount())
+
 	err := e.tracesExporter.ConsumeTraces(context.Background(), traces)
+
+	println("ConsumeTraces returned")
 	if err != nil {
+		println("Error in ConsumeTraces")
+		println(err.Error())
 		e.settings.Logger.Error("failed to export traces", zap.Error(err))
 		return api.StatusError(err.Error())
 	}
+
+	println("ConsumeTraces succeeded")
 
 	return api.StatusSuccess()
 }
