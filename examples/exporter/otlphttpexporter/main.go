@@ -11,6 +11,23 @@ import (
 	"go.uber.org/zap"
 )
 
+// TODO: Fix the bug when we use sending queue on exporter.
+// Currently, the exporter is not working properly with sending queue because of the architecture of the wasm plugin.
+//
+// Here's the example of the configuration:
+//
+// ```yaml
+// exporters:
+//   wasm/otlphttpexporter:
+//     path: "/path/to/main.wasm"
+//     plugin_config:
+//       sending_queue:
+//         enabled: false
+// ```
+//
+// You MUST disable the sending queue when you use the otlphttpexporter built as a wasm module.
+// For more details, see https://github.com/otelwasm/otelwasm/issues/60
+
 func init() {
 	logger, err := zap.NewDevelopment()
 	if err != nil {
