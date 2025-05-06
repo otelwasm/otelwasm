@@ -5,10 +5,10 @@ import (
 
 	"github.com/otelwasm/otelwasm/examples/exporter/otlphttpexporter/otlphttpexporter"
 	"github.com/otelwasm/otelwasm/guest/api"
+	"github.com/otelwasm/otelwasm/guest/factoryconnector"
 	"github.com/otelwasm/otelwasm/guest/plugin" // register exporters
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/component/componenttest"
-	"go.opentelemetry.io/collector/config/confighttp"
 	"go.opentelemetry.io/collector/exporter"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	"go.uber.org/zap"
@@ -58,33 +58,33 @@ func init() {
 		BuildInfo:         component.NewDefaultBuildInfo(),
 	}
 
-	// connector := factoryconnector.NewExporterConnector(factory, settings)
+	connector := factoryconnector.NewExporterConnector(factory, settings)
 
-	// plugin.Set(struct {
-	// 	api.MetricsExporter
-	// 	api.LogsExporter
-	// 	api.TracesExporter
-	// }{
-	// 	connector.Metrics(),
-	// 	connector.Logs(),
-	// 	connector.Traces(),
+	plugin.Set(struct {
+		api.MetricsExporter
+		api.LogsExporter
+		api.TracesExporter
+	}{
+		connector.Metrics(),
+		connector.Logs(),
+		connector.Traces(),
+	})
+
+	// e, err := factory.CreateTraces(context.Background(), settings, &otlphttpexporter.Config{
+	// 	ClientConfig: confighttp.ClientConfig{Endpoint: "http://localhost:4319"},
+	// 	Encoding:     otlphttpexporter.EncodingProto,
 	// })
+	// if err != nil {
+	// 	panic(err)
+	// }
 
-	e, err := factory.CreateTraces(context.Background(), settings, &otlphttpexporter.Config{
-		ClientConfig: confighttp.ClientConfig{Endpoint: "http://localhost:4319"},
-		Encoding:     otlphttpexporter.EncodingProto,
-	})
-	if err != nil {
-		panic(err)
-	}
+	// if err := e.Start(context.Background(), componenttest.NewNopHost()); err != nil {
+	// 	panic(err)
+	// }
 
-	if err := e.Start(context.Background(), componenttest.NewNopHost()); err != nil {
-		panic(err)
-	}
-
-	plugin.Set(exp{
-		e: e,
-	})
+	// plugin.Set(exp{
+	// 	e: e,
+	// })
 }
 
 func main() {}

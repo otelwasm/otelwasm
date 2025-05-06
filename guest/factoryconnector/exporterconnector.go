@@ -2,6 +2,7 @@ package factoryconnector
 
 import (
 	"context"
+	"time"
 
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/otelwasm/otelwasm/guest/api"
@@ -166,7 +167,10 @@ func (e *tracesExporter) PushTraces(traces ptrace.Traces) *api.Status {
 
 	err := e.tracesExporter.ConsumeTraces(context.Background(), traces)
 
-	println("ConsumeTraces returned")
+	// Sleep resolves everything
+	time.Sleep(1 * time.Second)
+	println("After sleep")
+
 	if err != nil {
 		println("Error in ConsumeTraces")
 		println(err.Error())
