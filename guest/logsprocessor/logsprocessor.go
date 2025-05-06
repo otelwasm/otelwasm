@@ -26,7 +26,7 @@ var _ func() uint32 = _processLogs
 func _processLogs() uint32 {
 	logs := imports.CurrentLogs()
 	result, status := logsprocessor.ProcessLogs(logs)
-	if (result == plog.Logs{}) {
+	if (result != plog.Logs{}) {
 		pubimports.SetResultLogs(result)
 	}
 	runtime.KeepAlive(result) // until ptr is no longer needed

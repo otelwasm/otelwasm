@@ -26,7 +26,7 @@ var _ func() uint32 = _processMetrics
 func _processMetrics() uint32 {
 	metrics := imports.CurrentMetrics()
 	result, status := metricsprocessor.ProcessMetrics(metrics)
-	if result == (pmetric.Metrics{}) {
+	if result != (pmetric.Metrics{}) {
 		pubimports.SetResultMetrics(result)
 	}
 	runtime.KeepAlive(result) // until ptr is no longer needed

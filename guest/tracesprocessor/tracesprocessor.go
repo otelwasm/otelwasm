@@ -26,7 +26,7 @@ var _ func() uint32 = _processTraces
 func _processTraces() uint32 {
 	traces := imports.CurrentTraces()
 	result, status := tracesprocessor.ProcessTraces(traces)
-	if result == (ptrace.Traces{}) {
+	if result != (ptrace.Traces{}) {
 		pubimports.SetResultTraces(result)
 	}
 	runtime.KeepAlive(result) // until ptr is no longer needed
