@@ -26,6 +26,8 @@ var _ func() uint32 = _processTraces
 func _processTraces() uint32 {
 	traces := imports.CurrentTraces()
 	result, status := tracesprocessor.ProcessTraces(traces)
+	// If the result is not empty, set it in the host.
+	// In case of empty result, the result should be written inside the guest call.
 	if result != (ptrace.Traces{}) {
 		pubimports.SetResultTraces(result)
 	}

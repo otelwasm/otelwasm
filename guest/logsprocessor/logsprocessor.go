@@ -26,6 +26,8 @@ var _ func() uint32 = _processLogs
 func _processLogs() uint32 {
 	logs := imports.CurrentLogs()
 	result, status := logsprocessor.ProcessLogs(logs)
+	// If the result is not empty, set it in the host.
+	// In case of empty result, the result should be written inside the guest call.
 	if (result != plog.Logs{}) {
 		pubimports.SetResultLogs(result)
 	}
