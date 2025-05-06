@@ -7,6 +7,7 @@ import (
 	pubimports "github.com/otelwasm/otelwasm/guest/imports"
 	"github.com/otelwasm/otelwasm/guest/internal/imports"
 	"github.com/otelwasm/otelwasm/guest/internal/plugin"
+	"go.opentelemetry.io/collector/pdata/plog"
 )
 
 var logsprocessor api.LogsProcessor
@@ -25,7 +26,9 @@ var _ func() uint32 = _processLogs
 func _processLogs() uint32 {
 	logs := imports.CurrentLogs()
 	result, status := logsprocessor.ProcessLogs(logs)
-	pubimports.SetResultLogs(result)
+	if (result == plog.Logs{}) {
+		pubimports.SetResultLogs(result)
+	}
 	runtime.KeepAlive(result) // until ptr is no longer needed
 
 	return imports.StatusToCode(status)

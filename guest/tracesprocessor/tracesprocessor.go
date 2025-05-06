@@ -7,6 +7,7 @@ import (
 	pubimports "github.com/otelwasm/otelwasm/guest/imports"
 	"github.com/otelwasm/otelwasm/guest/internal/imports"
 	"github.com/otelwasm/otelwasm/guest/internal/plugin"
+	"go.opentelemetry.io/collector/pdata/ptrace"
 )
 
 var tracesprocessor api.TracesProcessor
@@ -25,8 +26,9 @@ var _ func() uint32 = _processTraces
 func _processTraces() uint32 {
 	traces := imports.CurrentTraces()
 	result, status := tracesprocessor.ProcessTraces(traces)
-	pubimports.SetResultTraces(result)
+	if result == (ptrace.Traces{}) {
+		pubimports.SetResultTraces(result)
+	}
 	runtime.KeepAlive(result) // until ptr is no longer needed
-
 	return imports.StatusToCode(status)
 }
