@@ -58,6 +58,15 @@ copy-wasm-examples: build-wasm-examples
 		cp "$$example" "$${target_dir}/"; \
 	done
 
+.PHONY: benchmark
+benchmark: copy-wasm-examples
+	@echo "Running benchmarks for all modules..."
+	@(cd wasmprocessor; $(GOCMD) test -run='^$$' -bench=. -benchmem -tags docker)
+	@(cd wasmexporter; $(GOCMD) test -run='^$$' -bench=. -benchmem -tags docker)
+	@(cd wasmreceiver; $(GOCMD) test -run='^$$' -bench=. -benchmem -tags docker)
+	@(cd guest; $(GOCMD) test -run='^$$' -bench=. -benchmem -tags docker ./...)
+	@echo "Benchmarks completed."
+
 .PHONY: docker-otelwasmcol
 docker-otelwasmcol:
 	GOOS=linux GOARCH=$(GOARCH) $(MAKE) otelwasmcol
@@ -73,4 +82,3 @@ genotelwasmcol:
 otelwasmcol: genotelwasmcol
 	cd ./cmd/otelwasmcol && GO111MODULE=on CGO_ENABLED=0 $(GOCMD) build -trimpath -o ../../bin/otelwasmcol_$(GOOS)_$(GOARCH)$(EXTENSION) \
 		-tags $(GO_BUILD_TAGS) .
-
