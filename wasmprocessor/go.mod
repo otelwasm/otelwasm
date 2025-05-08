@@ -3,6 +3,8 @@ module github.com/otelwasm/otelwasm/wasmprocessor
 go 1.24.2
 
 require (
+	github.com/go-viper/mapstructure/v2 v2.2.1
+	github.com/otelwasm/otelwasm/examples/processor/add_new_attribute v0.0.0-00010101000000-000000000000
 	github.com/otelwasm/otelwasm/wasmplugin v0.0.0
 	go.opentelemetry.io/collector/component v1.31.0
 	go.opentelemetry.io/collector/component/componenttest v0.125.0
@@ -14,6 +16,8 @@ require (
 	go.opentelemetry.io/collector/processor/processorhelper v0.125.0
 	go.opentelemetry.io/collector/processor/processortest v0.125.0
 )
+
+require golang.org/x/exp v0.0.0-20240506185415-9bf2ced13842 // indirect
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
@@ -57,3 +61,5 @@ require (
 )
 
 replace github.com/otelwasm/otelwasm/wasmplugin => ../wasmplugin
+
+replace github.com/otelwasm/otelwasm/examples/processor/add_new_attribute => ../examples/processor/add_new_attribute
