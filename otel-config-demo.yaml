@@ -1,0 +1,22 @@
+receivers:
+  wasm/otlpreceiver:
+    path: "./cnds2025demo.wasm"
+    include: [ ./input.log ]
+    operators:
+      - type: regex_parser
+        regex: '^(?P<msg>.*)$'
+
+processors:
+  wasm/demo:
+    path: "./cnds2025demo.wasm"
+
+exporters:
+  file:
+    path: ./output.log
+
+service:
+  pipelines:
+    logs:
+      receivers: [filelog]
+      processors: [wasm/demo]
+      exporters: [file]
