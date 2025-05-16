@@ -75,7 +75,7 @@ func (b *Builder) Build() error {
 		return fmt.Errorf("failed to get absolute path of output file %s: %w", b.Output, err)
 	}
 
-	err = b.exec("go", "tool", "wasibuilder", "go", "build", "-o", output, ".")
+	err = b.exec("go", "tool", "wasibuilder", "go", "build", "-buildmode=c-shared", "-o", output, ".")
 	if err != nil {
 		return fmt.Errorf("failed to build package %s: %w", b.Package, err)
 	}
