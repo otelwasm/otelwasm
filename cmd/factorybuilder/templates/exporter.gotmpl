@@ -1,0 +1,42 @@
+package main
+
+import (
+	upstream "{{ .UpstreamPackage }}"
+	"github.com/otelwasm/otelwasm/guest/api"
+	"github.com/otelwasm/otelwasm/guest/factoryconnector"
+	"github.com/otelwasm/otelwasm/guest/plugin"
+	"go.opentelemetry.io/collector/component"
+	"go.opentelemetry.io/collector/component/componenttest"
+	"go.opentelemetry.io/collector/exporter"
+	"go.uber.org/zap"
+)
+
+func init() {
+	logger, err := zap.NewProduction()
+	if err != nil {
+		panic(err)
+	}
+
+	factory := upstream.NewFactory()
+	telemetrySettings := componenttest.NewNopTelemetrySettings()
+	telemetrySettings.Logger = logger
+
+	settings := exporter.Settings{
+		ID:                component.MustNewID(factory.Type().String()),
+		TelemetrySettings: telemetrySettings,
+		BuildInfo:         component.NewDefaultBuildInfo(),
+	}
+
+	connector := factoryconnector.NewExporterConnector(factory, settings)
+
+	plugin.Set(struct {
+		api.LogsExporter
+		api.MetricsExporter
+		api.TracesExporter
+	}{
+		connector.Logs(),
+		connector.Metrics(),
+		connector.Traces(),
+	})
+}
+func main() {}
