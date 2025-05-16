@@ -82,3 +82,7 @@ genotelwasmcol:
 otelwasmcol: genotelwasmcol
 	cd ./cmd/otelwasmcol && GO111MODULE=on CGO_ENABLED=0 $(GOCMD) build -trimpath -o ../../bin/otelwasmcol_$(GOOS)_$(GOARCH)$(EXTENSION) \
 		-tags $(GO_BUILD_TAGS) .
+
+.PHONY: factorybuilder
+factorybuilder:
+	$(GOCMD) build -o bin/factorybuilder ./cmd/factorybuilder
