@@ -1,22 +1,30 @@
 receivers:
   wasm/otlpreceiver:
-    path: "./cnds2025demo.wasm"
-    include: [ ./input.log ]
-    operators:
-      - type: regex_parser
-        regex: '^(?P<msg>.*)$'
+    path: "./otlpreceiver.wasm"
+    plugin_config:
+      protocols:
+        http:
+          endpoint: "localhost:4318"
 
 processors:
-  wasm/demo:
-    path: "./cnds2025demo.wasm"
+  wasm/attributesprocessor:
+    path: "./attributesprocessor.wasm"
+    plugin_config:
+      actions:
+        - key: "new_attribute"
+          value: "new_value"
+          action: "insert"
 
 exporters:
-  file:
-    path: ./output.log
+  wasm/otlphttpexporter:
+    path: ./otlphttpexporter.wasm
+    plugin_config:
+      sending_queue:
+      enabled: false
 
 service:
   pipelines:
     logs:
-      receivers: [filelog]
-      processors: [wasm/demo]
-      exporters: [file]
+      receivers: [wasm/otlpreceiver]
+      processors: [wasm/attributesprocessor:]
+      exporters: [wasm/otlphttpexporter]
