@@ -1,173 +1,248 @@
 Output sample1.mp4
-Set Shell zsh
-Set FontSize 12
-Set Width 600
-Set Height 450
+Set Shell bash
+Set FontSize 36
+Set Width 1280
+Set Height 720
 Set Framerate 60
 Set Padding 10
+Set TypingSpeed 0.2
+Set WaitTimeout 30s
 
-Type ": Create a new directory for the demo"
+Type "# Create a new directory for the demo"
 Enter
-Type "rm -r demo2"
-Enter
-Type "mkdir demo2; cd demo2"
+Type "cd $(mktemp -d)"
 Enter
 Wait
 Sleep 3s
 
 Enter
-Type ': Create a new Go module'
+Type "# Let's build WASM modules for otel components!"
 Enter
-Type "go mod init cnds2025demo"
-Enter
-Wait
-
-Enter
-Type ": Install dependencies"
-Enter
-Type "go get github.com/otelwasm/otelwasm/guest"
 Enter
 Wait
+Sleep 1s
 
+Type "# Build otlpreceiver"
 Enter
-Type "go get go.opentelemetry.io/collector/pdata/plog"
+Sleep 1s
+Type "factorybuilder go.opentelemetry.io/collector/receiver/otlpreceiver"
+Enter
 Enter
 Wait
 Sleep 5s
 
+Type "# Add receiver to the otel-collector config"
 Enter
-Type ": Create a new Go file"
-Enter
-Sleep 2s
-
-# Open the Go file in a text editor
-Type "vim main.go"
-Enter
-Sleep 1s
-Type ":syntax on"
+Type "vim otel-config.yaml"
 Enter
 Sleep 1s
 Type "i"
 Sleep 1s
-# Write the Go code
-Type `package main`
-Enter
-Type ``
-Enter
-Type `import (`
-Enter
-Type `  "go.opentelemetry.io/collector/pdata/plog"`
-Enter
-Type ``
-Enter
-Type `  // Import guest API`
-Enter
-Type `  "github.com/otelwasm/otelwasm/guest/api"`
-Enter
-Type `  "github.com/otelwasm/otelwasm/guest/plugin"`
-Enter
-Type `)`
-Enter
-Type ``
-Enter
-Type `type processor struct {`
-Enter
-Type `}`
-Enter
-Type ``
-Enter
-Type `var _ api.LogsProcessor = (*processor)(nil)`
-Enter
-Type ``
-Enter
 
-Type `func (p *processor) ProcessLogs(logs plog.Logs) (plog.Logs, *api.Status) {`
+Type `receivers:`
 Enter
-Type `  // Add 'event' attribute to each log record`
+Type `  wasm/otlpreceiver:`
 Enter
-Sleep 3s
+Type `    path: "./otlpreceiver.wasm"`
 Enter
-Type `  for _, resourceLogs := range logs.ResourceLogs().All() {`
+Type `    plugin_config:`
 Enter
-Type `    for _, scopeLog := range resourceLogs.ScopeLogs().All() {`
+Type `      protocols:`
 Enter
-Type `      for _, logRecord := range scopeLog.LogRecords().All() {`
+Type `        http:`
 Enter
-Type `        logRecord.Attributes().PutStr("event", "cnds2025")`
+Type `          endpoint: "localhost:4318"`
 Enter
-Type `      }`
 Enter
-Type `    }`
-Enter
-Type `  }`
-Enter
-Type ``
-Enter
-Type `  return logs, nil`
-Enter
-Sleep 3s
-Type `}`
-Enter
-
-
-Type ``
-Enter
-Type `func init() {`
-Enter
-Type `  // Register the processor as logs processor`
-Enter
-Type `  plugin.Set(&processor{})`
-Enter
-Sleep 3s
-Type `}`
-Enter
-Type ``
-Enter
-Type `func main() {`
-Enter
-Type `}`
-Enter
-Sleep 10s
+Sleep 5s
 
 Ctrl+C
 Type ":wq"
 Enter
 Wait
-
-Sleep 1s
-Type "clear"
-Enter
-
-Type ": Build the Go code into a WebAssembly module with wasibuilder"
-Enter
-# Install wasibuilder
-Type "go install github.com/otelwasm/wasibuilder@latest"
-Enter
-Wait
-
-# Build the Go code into a WebAssembly module
-Type "wasibuilder go build -o cnds2025demo.wasm"
-Enter
-Wait
-
-Type "ls -l"
-Enter
-Wait
 Sleep 3s
 
 Type "clear"
 Enter
 Sleep 1s
 
-Type ": Prepare the OpenTelemetry Collector configuration"
-Type "cp ../otel-config-demo.yaml ."
+Type "# Build attributesprocessor"
 Enter
-Wait
-Sleep 3s
-
-Type "bat otel-config-demo.yaml"
+Sleep 1s
+Type "factorybuilder github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor"
+Enter
 Enter
 Wait
 Sleep 5s
 
-Type "otelwasm"
+Type "# Add processor to the otel-collector config"
+Enter
+Type "vim otel-config.yaml"
+Enter
+Sleep 1s
+Shift+G
+Type "i"
+Sleep 1s
+
+Type `processors:`
+Enter
+Type `  wasm/attributesprocessor:`
+Enter
+Type `    path: "./attributesprocessor.wasm"`
+Enter
+Type `    plugin_config:`
+Enter
+Type `      actions:`
+Enter
+Type `        - key: "event"`
+Enter
+Type `          value: "cnds2025"`
+Enter
+Type `          action: "insert"`
+Enter
+Enter
+Sleep 5s
+
+Ctrl+C
+Type ":wq"
+Enter
+Wait
+Sleep 3s
+
+Type "clear"
+Enter
+Sleep 1s
+
+Type "# Build stdoutexporter"
+Enter
+Sleep 1s
+Type "git clone https://github.com/otelwasm/otelwasm.git"
+Enter
+Wait
+Sleep 1s
+Type "pushd otelwasm/examples/exporter/stdout"
+Enter
+Sleep 3s
+Type "wasibuilder go build -buildmode=c-shared -o stdoutexporter.wasm ."
+Enter
+Wait
+Sleep 5s
+Type "popd"
+Enter
+Wait
+Sleep 3s
+Type "cp otelwasm/examples/exporter/stdout/stdoutexporter.wasm ."
+Enter
+Wait
+Sleep 5s
+
+Type "# Add exporter to the otel-collector config"
+Enter
+Type "vim otel-config.yaml"
+Enter
+Sleep 1s
+Shift+G
+Type "i"
+Sleep 1s
+
+Type `exporters:`
+Enter
+Type `  wasm/stdoutexporter:`
+Enter
+Type `    path: ./stdoutexporter.wasm`
+Enter
+Type `    plugin_config:`
+Enter
+Type `      sending_queue:`
+Enter
+Type `        enabled: false`
+Enter
+Sleep 5s
+
+Enter
+Type `service:`
+Enter
+Type `  pipelines:`
+Enter
+Type `    logs:`
+Enter
+Type `      receivers: [wasm/otlpreceiver]`
+Enter
+Type `      processors: [wasm/attributesprocessor]`
+Enter
+Type `      exporters: [wasm/stdoutexporter]`
+Enter
+Sleep 5s
+
+Ctrl+C
+Type ":wq"
+Enter
+Wait
+Sleep 3s
+
+Type "clear"
+Enter
+Sleep 1s
+
+Type "bat otel-config.yaml"
+Enter
+Down
+Sleep 1s
+Down
+Sleep 1s
+Down
+Sleep 1s
+Down
+Sleep 1s
+Down
+Sleep 1s
+Down
+Sleep 1s
+Type "q"
+Wait
+Sleep 5s
+
+Type "tmux"
+Enter
+Sleep 1s
+
+Type `otelwasmcol --config otel-config.yaml | grep --color -e cnds2025 -e 'Hello OTLP log!'`
+Enter
+Sleep 5s
+
+Ctrl+S
+Type `"`
+Sleep 5s
+
+Type `curl https://gist.githubusercontent.com/`
+Type@0ms `tsuzu/0de1f1203f491719ff78fc0d22e881b3/raw/94192ac4544c4d2ec6a5d4f95908723af9ac4079/otlp-log.json`
+Type ` > log.json`
+Enter
+Sleep 3s
+
+Type `cat log.json | jq -10 --color "Hello"`
+Enter
+Sleep 5s
+
+Type `curl -v -X POST \`
+Enter
+Sleep 1s
+Type `  -H "Content-Type: application/json" \`
+Enter
+Sleep 1s
+Type `  --data-binary @log.json \`
+Enter
+Sleep 1s
+Type `  http://localhost:4318/v1/logs`
+Enter
+Sleep 10s
+
+Type "exit"
+Enter
+Sleep 1s
+
+Ctrl+C
+
+Type "exit"
+Enter
+Sleep 1s
