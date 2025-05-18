@@ -179,6 +179,7 @@ func BenchmarkAttributesProcessorWasmInterpreter(b *testing.B) {
 	}
 }
 
+// TODO(tsuzu): Investigate why this crashes on arm64 (related to #64)
 // func BenchmarkAttributesProcessorWasmCompiled(b *testing.B) {
 // 	// Test that the processor can be created with the default config
 // 	factory := NewFactory()
