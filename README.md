@@ -28,39 +28,47 @@ flowchart LR
   FO --> EN[[wasmexporter N]]
 ```
 
+### wasmprocessor
+
 ```mermaid
 sequenceDiagram
     participant Collector as OpenTelemetry Collector
     participant Processor as wasmprocessor (Host Side)
     participant Memory as Wasm Memory
     participant GuestModule as Wasm Module (Guest Side)
-    
-    Collector->>Processor: ConsumeMetrics
-    
-    Note over Processor: メトリクスデータを処理しWasm呼び出しを準備
-    
-    Processor->>GuestModule: processMetrics()関数呼び出し
-    
-    Note over Processor,Memory: プロトコルバッファ処理
-    Processor->>Memory: メトリクスをprotobuf形式でWasmメモリに書き込み
-    
-    Memory-->>GuestModule: メモリからメトリクスデータを読取り
-    
-    Note over GuestModule: カスタムメトリクス<br>処理ロジックを実行
-    
-    GuestModule->>Memory: 処理結果をprotobuf形式でWasmメモリに書き込み
-    
+
+    Collector->>Processor: Consume()
+
+    Processor->>GuestModule: Guest Function呼び出し
+
+    Note over Processor: Go StructからOTLP protobuf形式にシリアライズ
+    Processor->>Memory: テレメトリーをOTLP protobuf形式でWasmメモリに書き込み
+
+    Memory-->>GuestModule: メモリからテレメトリーデータを読取り
+
+    Note over GuestModule: OTLP protobuf形式からデリシアライズ
+
+    GuestModule->>GuestModule: 処理を実行
+
+    Note over GuestModule: OTLP protobuf形式にシリアライズ
+
+    GuestModule->>Memory: 処理結果をOTLP protobuf形式でWasmメモリに書き込み
+
     Memory-->>Processor: メモリから処理結果を読取り
-    
-    Note over Processor: protobufからメトリクス形式にデシリアライズ
-    
+
+    Note over Processor: OTLP protobuf形式からGo Structにデシリアライズ
+
     GuestModule-->>Processor: 処理ステータスを返す
-    
+
     alt 処理成功
-        Processor-->>Collector: 処理済みメトリクスを返す
+        Processor-->>Collector: 処理済みのテレメトリーデータを返す
     else エラー発生
         Processor-->>Collector: エラーを返す
     end
-    
+
     Collector->>Collector: パイプライン処理を継続
 ```
+
+### wasmreceiver
+
+### wasmexporter
