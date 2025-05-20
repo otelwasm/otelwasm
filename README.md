@@ -32,43 +32,58 @@ flowchart LR
 
 ```mermaid
 sequenceDiagram
-    participant Collector as OpenTelemetry Collector
     participant Processor as wasmprocessor (Host Side)
-    participant Memory as Wasm Memory
     participant GuestModule as Wasm Module (Guest Side)
 
-    Collector->>Processor: Consume()
+    Note over Processor: テレメトリーデータが入力される
 
     Processor->>GuestModule: Guest Function呼び出し
 
     Note over Processor: Go StructからOTLP protobuf形式にシリアライズ
-    Processor->>Memory: テレメトリーをOTLP protobuf形式でWasmメモリに書き込み
+    Processor->>GuestModule: テレメトリーをOTLP protobuf形式でWasmメモリに書き込み
 
-    Memory-->>GuestModule: メモリからテレメトリーデータを読取り
-
-    Note over GuestModule: OTLP protobuf形式からデリシアライズ
+    Note over GuestModule: OTLP protobuf形式からデシリアライズ
 
     GuestModule->>GuestModule: 処理を実行
 
     Note over GuestModule: OTLP protobuf形式にシリアライズ
 
-    GuestModule->>Memory: 処理結果をOTLP protobuf形式でWasmメモリに書き込み
-
-    Memory-->>Processor: メモリから処理結果を読取り
+    GuestModule-->>Processor: Wasmメモリから処理結果を読取り
 
     Note over Processor: OTLP protobuf形式からGo Structにデシリアライズ
 
     GuestModule-->>Processor: 処理ステータスを返す
 
-    alt 処理成功
-        Processor-->>Collector: 処理済みのテレメトリーデータを返す
-    else エラー発生
-        Processor-->>Collector: エラーを返す
-    end
-
-    Collector->>Collector: パイプライン処理を継続
+    Note over Processor: 次のコンポーネントに処理を渡す
 ```
 
 ### wasmreceiver
+
+```mermaid
+sequenceDiagram
+    participant Processor as wasmprocessor (Host Side)
+    participant GuestModule as Wasm Module (Guest Side)
+
+    Note over Processor: テレメトリーデータが入力される
+
+    Processor->>GuestModule: Guest Function呼び出し
+
+    Note over Processor: Go StructからOTLP protobuf形式にシリアライズ
+    Processor->>GuestModule: テレメトリーをOTLP protobuf形式でWasmメモリに書き込み
+
+    Note over GuestModule: OTLP protobuf形式からデシリアライズ
+
+    GuestModule->>GuestModule: 処理を実行
+
+    Note over GuestModule: OTLP protobuf形式にシリアライズ
+
+    GuestModule-->>Processor: Wasmメモリから処理結果を読取り
+
+    Note over Processor: OTLP protobuf形式からGo Structにデシリアライズ
+
+    GuestModule-->>Processor: 処理ステータスを返す
+
+    Note over Processor: 次のコンポーネントに処理を渡す
+```
 
 ### wasmexporter
