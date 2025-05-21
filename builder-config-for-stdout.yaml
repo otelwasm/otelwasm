@@ -1,0 +1,15 @@
+dist:
+  module: github.com/open-telemetry/opentelemetry-collector-releases/contrib
+  name: otelcol-contrib
+  description: OpenTelemetry Collector Contrib
+  version: 0.126.0
+  output_path: ./_build
+
+exporters:
+  - gomod: github.com/tsuzu/stdoutexporter v0.0.4
+
+processors:
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor v0.126.0
+
+receivers:
+  - gomod: go.opentelemetry.io/collector/receiver/otlpreceiver v0.126.0

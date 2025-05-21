@@ -86,3 +86,11 @@ otelwasmcol: genotelwasmcol
 .PHONY: factorybuilder
 factorybuilder:
 	$(GOCMD) build -o bin/factorybuilder ./cmd/factorybuilder
+
+.PHONY: record
+record:
+	rm -r demo || true
+	mkdir -p demo
+
+	cd demo && vhs ../non-wasm.tape
+	cd demo && vhs ../demo.tape
