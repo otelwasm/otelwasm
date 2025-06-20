@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"sync/atomic"
 
@@ -18,6 +19,8 @@ import (
 	"go.opentelemetry.io/collector/pdata/plog"
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.opentelemetry.io/collector/pdata/ptrace"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 const (
@@ -37,6 +40,7 @@ const (
 	getPluginConfig       = "getPluginConfig"
 	setResultStatusReason = "setResultStatusReason"
 	getShutdownRequested  = "getShutdownRequested"
+	logMessage            = "logMessage"
 
 	// Guest function
 	getSupportedTelemetry = "getSupportedTelemetry"
@@ -118,6 +122,9 @@ type Stack struct {
 
 	// PluginConfigJSON is the plugin config in JSON representation passed to the guest
 	PluginConfigJSON []byte
+
+	// Logger is the host-side logger for the WASM plugin
+	Logger *zap.Logger
 }
 
 // paramsFromContext retrieves the Stack from the context
@@ -319,7 +326,80 @@ func (p *WasmPlugin) Shutdown(ctx context.Context) error {
 	return nil
 }
 
+// LogMessage represents a structured log message from the guest
+type LogMessage struct {
+	Level   int32             `json:"level"`
+	Message string            `json:"message"`
+	Fields  map[string]string `json:"fields"`
+}
+
+// zapLevelFromSlogLevel converts slog.Level to zapcore.Level
+func zapLevelFromSlogLevel(level slog.Level) zapcore.Level {
+	switch {
+	case level <= slog.LevelDebug:
+		return zapcore.DebugLevel
+	case level <= slog.LevelInfo:
+		return zapcore.InfoLevel
+	case level <= slog.LevelWarn:
+		return zapcore.WarnLevel
+	default:
+		return zapcore.ErrorLevel
+	}
+}
+
 // Host function implementations
+func logMessageFn(ctx context.Context, mod api.Module, stack []uint64) {
+	// Read buffer pointer and size from the stack
+	buf := uint32(stack[0])
+	size := uint32(stack[1])
+
+	// Read the serialized log message from WASM memory
+	logBytes, ok := mod.Memory().Read(buf, size)
+	if !ok {
+		panic("out of memory reading log message") // Bug: caller passed a length outside memory
+	}
+
+	// Unmarshal the log message
+	var logMsg LogMessage
+	if err := json.Unmarshal(logBytes, &logMsg); err != nil {
+		// If we can't unmarshal, log the raw message as a fallback
+		if logger := paramsFromContext(ctx).Logger; logger != nil {
+			logger.Error("failed to unmarshal log message from guest", zap.String("raw_message", string(logBytes)), zap.Error(err))
+		}
+		return
+	}
+
+	// Get the logger from context
+	logger := paramsFromContext(ctx).Logger
+	if logger == nil {
+		// No logger available, skip logging
+		return
+	}
+
+	// Convert slog level to zap level
+	zapLevel := zapLevelFromSlogLevel(slog.Level(logMsg.Level))
+
+	// Create zap fields from the structured fields
+	fields := make([]zap.Field, 0, len(logMsg.Fields))
+	for key, value := range logMsg.Fields {
+		fields = append(fields, zap.String(key, value))
+	}
+
+	// Log the message at the appropriate level
+	switch zapLevel {
+	case zapcore.DebugLevel:
+		logger.Debug(logMsg.Message, fields...)
+	case zapcore.InfoLevel:
+		logger.Info(logMsg.Message, fields...)
+	case zapcore.WarnLevel:
+		logger.Warn(logMsg.Message, fields...)
+	case zapcore.ErrorLevel:
+		logger.Error(logMsg.Message, fields...)
+	default:
+		logger.Info(logMsg.Message, fields...)
+	}
+}
+
 func currentTracesFn(ctx context.Context, mod api.Module, stack []uint64) {
 	buf := uint32(stack[0])
 	bufLimit := uint32(stack[1])
@@ -487,6 +567,9 @@ func instantiateHostModule(ctx context.Context, runtime wazero.Runtime) (api.Mod
 		NewFunctionBuilder().
 		WithGoModuleFunction(api.GoModuleFunc(getShutdownRequestedFn), []api.ValueType{}, []api.ValueType{api.ValueTypeI32}).
 		Export(getShutdownRequested).
+		NewFunctionBuilder().
+		WithGoModuleFunction(api.GoModuleFunc(logMessageFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{}).
+		WithParameterNames("buf", "buf_len").Export(logMessage).
 		Instantiate(ctx)
 }
 

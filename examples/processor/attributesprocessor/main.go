@@ -4,6 +4,7 @@ import (
 	"github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor"
 	"github.com/otelwasm/otelwasm/guest/api"
 	"github.com/otelwasm/otelwasm/guest/factoryconnector"
+	"github.com/otelwasm/otelwasm/guest/logging"
 	"github.com/otelwasm/otelwasm/guest/plugin" // register processors
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/component/componenttest"
@@ -12,8 +13,14 @@ import (
 )
 
 func init() {
+	// Log processor initialization
+	logging.Info("Initializing attributes processor plugin")
+
 	logger, err := zap.NewDevelopment()
 	if err != nil {
+		logging.Error("Failed to create logger", map[string]string{
+			"error": err.Error(),
+		})
 		panic(err)
 	}
 
@@ -40,6 +47,11 @@ func init() {
 		connector.Metrics(),
 		connector.Logs(),
 		connector.Traces(),
+	})
+
+	logging.Info("Attributes processor plugin initialized successfully", map[string]string{
+		"processor_id": "attributes",
+		"supports":     "traces,metrics,logs",
 	})
 }
 

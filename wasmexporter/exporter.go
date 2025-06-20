@@ -9,6 +9,7 @@ import (
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	"go.opentelemetry.io/collector/pipeline"
+	"go.uber.org/zap"
 )
 
 const (
@@ -19,10 +20,11 @@ const (
 
 type wasmExporter struct {
 	plugin *wasmplugin.WasmPlugin
+	logger *zap.Logger
 }
 
 // newWasmTracesExporter creates a new traces exporter using WebAssembly
-func newWasmTracesExporter(ctx context.Context, cfg *Config) (*wasmExporter, error) {
+func newWasmTracesExporter(ctx context.Context, cfg *Config, logger *zap.Logger) (*wasmExporter, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
@@ -45,11 +47,12 @@ func newWasmTracesExporter(ctx context.Context, cfg *Config) (*wasmExporter, err
 
 	return &wasmExporter{
 		plugin: plugin,
+		logger: logger,
 	}, nil
 }
 
 // newWasmMetricsExporter creates a new metrics exporter using WebAssembly
-func newWasmMetricsExporter(ctx context.Context, cfg *Config) (*wasmExporter, error) {
+func newWasmMetricsExporter(ctx context.Context, cfg *Config, logger *zap.Logger) (*wasmExporter, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
@@ -72,11 +75,12 @@ func newWasmMetricsExporter(ctx context.Context, cfg *Config) (*wasmExporter, er
 
 	return &wasmExporter{
 		plugin: plugin,
+		logger: logger,
 	}, nil
 }
 
 // newWasmLogsExporter creates a new logs exporter using WebAssembly
-func newWasmLogsExporter(ctx context.Context, cfg *Config) (*wasmExporter, error) {
+func newWasmLogsExporter(ctx context.Context, cfg *Config, logger *zap.Logger) (*wasmExporter, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
@@ -99,6 +103,7 @@ func newWasmLogsExporter(ctx context.Context, cfg *Config) (*wasmExporter, error
 
 	return &wasmExporter{
 		plugin: plugin,
+		logger: logger,
 	}, nil
 }
 
@@ -109,6 +114,7 @@ func (wp *wasmExporter) pushTraces(
 	stack := &wasmplugin.Stack{
 		CurrentTraces:    td,
 		PluginConfigJSON: wp.plugin.PluginConfigJSON,
+		Logger:           wp.logger,
 	}
 
 	res, err := wp.plugin.ProcessFunctionCall(ctx, pushTracesFunctionName, stack)
@@ -131,6 +137,7 @@ func (wp *wasmExporter) pushMetrics(
 	stack := &wasmplugin.Stack{
 		CurrentMetrics:   md,
 		PluginConfigJSON: wp.plugin.PluginConfigJSON,
+		Logger:           wp.logger,
 	}
 
 	res, err := wp.plugin.ProcessFunctionCall(ctx, pushMetricsFunctionName, stack)
@@ -153,6 +160,7 @@ func (wp *wasmExporter) pushLogs(
 	stack := &wasmplugin.Stack{
 		CurrentLogs:      ld,
 		PluginConfigJSON: wp.plugin.PluginConfigJSON,
+		Logger:           wp.logger,
 	}
 
 	res, err := wp.plugin.ProcessFunctionCall(ctx, pushLogsFunctionName, stack)

@@ -24,3 +24,7 @@ go.work.sum
 bin/
 otelcol-dev/
 ocb
+
+# We're going to ignore this for now to let users to have their own CLAUDE.md.
+# We could decide later whether we should commit our own CLAUDE.md managed by the community.
+CLAUDE.md

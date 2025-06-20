@@ -18,3 +18,6 @@ func setResultStatusReason(ptr, size uint32)
 
 //go:wasmimport opentelemetry.io/wasm getShutdownRequested
 func getShutdownRequested() uint32
+
+//go:wasmimport opentelemetry.io/wasm logMessage
+func logMessage(ptr, size uint32)
