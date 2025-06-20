@@ -9,6 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tetratelabs/wazero"
+	"go.opentelemetry.io/collector/component"
+	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
@@ -238,4 +240,50 @@ func TestZapLevelFromSlogLevel(t *testing.T) {
 			assert.Equal(t, tt.expected, level)
 		})
 	}
+}
+
+func TestTelemetrySettingsToSerializable(t *testing.T) {
+	// Create test telemetry settings
+	ts := component.TelemetrySettings{
+		Resource: pcommon.NewResource(),
+	}
+
+	// Add some resource attributes
+	attrs := ts.Resource.Attributes()
+	attrs.PutStr("service.name", "test-service")
+	attrs.PutStr("service.version", "1.0.0")
+	attrs.PutInt("test.number", 42)
+	attrs.PutBool("test.bool", true)
+	attrs.PutDouble("test.double", 3.14)
+
+	// Convert to serializable
+	serializable := telemetrySettingsToSerializable(ts)
+
+	// Verify the conversion
+	assert.Equal(t, "test-service", serializable.ServiceName)
+	assert.Equal(t, "1.0.0", serializable.ServiceVersion)
+	assert.Equal(t, "test-service", serializable.ResourceAttributes["service.name"])
+	assert.Equal(t, "1.0.0", serializable.ResourceAttributes["service.version"])
+	assert.Equal(t, int64(42), serializable.ResourceAttributes["test.number"])
+	assert.Equal(t, true, serializable.ResourceAttributes["test.bool"])
+	assert.Equal(t, 3.14, serializable.ResourceAttributes["test.double"])
+	assert.NotNil(t, serializable.ComponentID)
+}
+
+func TestTelemetrySettingsToSerializableEmpty(t *testing.T) {
+	// Create empty telemetry settings
+	ts := component.TelemetrySettings{
+		Resource: pcommon.NewResource(),
+	}
+
+	// Convert to serializable
+	serializable := telemetrySettingsToSerializable(ts)
+
+	// Verify the conversion
+	assert.Empty(t, serializable.ServiceName)
+	assert.Empty(t, serializable.ServiceVersion)
+	assert.NotNil(t, serializable.ResourceAttributes)
+	assert.Empty(t, serializable.ResourceAttributes)
+	assert.NotNil(t, serializable.ComponentID)
+	assert.Empty(t, serializable.ComponentID)
 }
