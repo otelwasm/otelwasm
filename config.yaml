@@ -1,0 +1,30 @@
+receivers:
+  wasm/otlpreceiver:
+    path: "./examples/receiver/otlpreceiver/main.wasm"
+processors:
+  wasm/nop:
+    path: "./examples/processor/nop/main.wasm"
+  wasm/attributes:
+    path: "./examples/processor/attributesprocessor/main.wasm"
+    plugin_config:
+      actions:
+      - key: inserted-attributes-by-wasm
+        action: insert
+        value: hello-from-wasm
+exporters:
+  wasm/stdout:
+    path: "./examples/exporter/stdout/main.wasm"
+  wasm/otlphttpexporter:
+    path: "./examples/exporter/otlphttpexporter/main.wasm"
+    plugin_config:
+      endpoint: "http://localhost:4319"
+      compression: none
+      sending_queue:
+        enabled: false
+
+service:
+  pipelines:
+    traces:
+      receivers: [wasm/otlpreceiver]
+      processors: [wasm/attributes]
+      exporters: [wasm/otlphttpexporter, wasm/stdout]

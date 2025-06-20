@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 
-	"github.com/otelwasm/otelwasm/guest/api"
 	"github.com/otelwasm/otelwasm/guest/factoryconnector"
 	"github.com/otelwasm/otelwasm/guest/imports"
 	"github.com/otelwasm/otelwasm/guest/plugin" // register processors
@@ -17,7 +16,7 @@ import (
 func init() {
 	// Create the factory
 	factory := &LoggingProcessorFactory{}
-	
+
 	settings := processor.Settings{
 		ID:                component.MustNewID("logging"),
 		TelemetrySettings: componenttest.NewNopTelemetrySettings(),
@@ -114,7 +113,7 @@ func (p *LoggingProcessor) ConsumeTraces(ctx context.Context, traces ptrace.Trac
 	// Process each resource span
 	for i := 0; i < traces.ResourceSpans().Len(); i++ {
 		rs := traces.ResourceSpans().At(i)
-		
+
 		imports.LogDebug("Processing resource span", map[string]interface{}{
 			"resource_index": i,
 			"scope_count":    rs.ScopeSpans().Len(),
@@ -123,7 +122,7 @@ func (p *LoggingProcessor) ConsumeTraces(ctx context.Context, traces ptrace.Trac
 		// Process each scope span
 		for j := 0; j < rs.ScopeSpans().Len(); j++ {
 			ss := rs.ScopeSpans().At(j)
-			
+
 			imports.LogDebug("Processing scope span", map[string]interface{}{
 				"scope_index": j,
 				"span_count":  ss.Spans().Len(),
@@ -132,7 +131,7 @@ func (p *LoggingProcessor) ConsumeTraces(ctx context.Context, traces ptrace.Trac
 			// Process each span
 			for k := 0; k < ss.Spans().Len(); k++ {
 				span := ss.Spans().At(k)
-				
+
 				// Log span details
 				imports.LogInfo("Processing span", map[string]interface{}{
 					"span_id":    span.SpanID().String(),
@@ -145,7 +144,7 @@ func (p *LoggingProcessor) ConsumeTraces(ctx context.Context, traces ptrace.Trac
 
 				// Add a custom attribute to demonstrate processing
 				span.Attributes().PutStr("processed_by", "logging_example_processor")
-				
+
 				// Log attribute addition
 				imports.LogDebug("Added processing attribute", map[string]interface{}{
 					"span_id":   span.SpanID().String(),
@@ -156,9 +155,9 @@ func (p *LoggingProcessor) ConsumeTraces(ctx context.Context, traces ptrace.Trac
 				// Simulate some processing logic
 				if span.Status().Code() == ptrace.StatusCodeError {
 					imports.LogWarn("Found span with error status", map[string]interface{}{
-						"span_id":        span.SpanID().String(),
-						"error_message":  span.Status().Message(),
-						"span_name":      span.Name(),
+						"span_id":       span.SpanID().String(),
+						"error_message": span.Status().Message(),
+						"span_name":     span.Name(),
 					})
 				}
 			}
