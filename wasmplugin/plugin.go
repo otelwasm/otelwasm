@@ -18,6 +18,8 @@ import (
 	"go.opentelemetry.io/collector/pdata/plog"
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.opentelemetry.io/collector/pdata/ptrace"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 const (
@@ -26,6 +28,8 @@ const (
 
 	// otelWasm is the name of the host module
 	otelWasm = "opentelemetry.io/wasm"
+
+	otelZapLogger = "opentelemetry.io/zap/logger"
 
 	// Host function exports
 	currentTraces         = "currentTraces"
@@ -96,6 +100,9 @@ type WasmPlugin struct {
 	// This is a workaround to avoid panic when calling wasi functions with different context than the one used to instantiate the host module.
 	// TODO: Remove this if possible after replacing WASI implementation with our own.
 	wasiP1HostModule *wasi_snapshot_preview1.Module
+
+	// logger is the logger instance
+	logger zapcore.Core
 }
 
 // stackKey is the key used to store the stack in the context
@@ -118,6 +125,8 @@ type Stack struct {
 
 	// PluginConfigJSON is the plugin config in JSON representation passed to the guest
 	PluginConfigJSON []byte
+
+	Logger zapcore.Core
 }
 
 // paramsFromContext retrieves the Stack from the context
@@ -126,7 +135,7 @@ func paramsFromContext(ctx context.Context) *Stack {
 }
 
 // NewWasmPlugin creates a new WasmPlugin instance
-func NewWasmPlugin(ctx context.Context, cfg *Config, requiredFunctions []string) (*WasmPlugin, error) {
+func NewWasmPlugin(ctx context.Context, cfg *Config, requiredFunctions []string, logger *zap.Logger) (*WasmPlugin, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
@@ -209,6 +218,7 @@ func NewWasmPlugin(ctx context.Context, cfg *Config, requiredFunctions []string)
 		PluginConfigJSON:  pluginConfigJSON,
 		ExportedFunctions: exportedFunctions,
 		wasiP1HostModule:  wasiP1HostModule,
+		logger:            logger.Core(),
 	}
 
 	return plugin, nil
@@ -257,6 +267,10 @@ func createContextWithStack(ctx context.Context, stack *Stack) context.Context {
 
 // ProcessFunctionCall executes a WASM function and handles stack management
 func (p *WasmPlugin) ProcessFunctionCall(ctx context.Context, functionName string, stack *Stack) ([]uint64, error) {
+	if stack.Logger == nil {
+		stack.Logger = p.logger
+	}
+
 	ctx = createContextWithStack(ctx, stack)
 	// Set the WASI host module instance in the context
 	ctx = withModuleInstance(ctx, p.wasiP1HostModule)
@@ -455,6 +469,89 @@ func setResultStatusReasonFn(ctx context.Context, mod api.Module, stack []uint64
 
 	// Store the status reason in context
 	paramsFromContext(ctx).StatusReason = string(reasonBytes)
+}
+
+// zap core compatible interface
+func zapCoreEnabledFn(ctx context.Context, mod api.Module, stack []uint64) {
+	// Read the logger from the context
+	logger := paramsFromContext(ctx).Logger
+
+	// Read the log level from the stack
+	level := zapcore.Level(stack[0])
+
+	// Check if the logger is enabled for the given level
+	if logger.Enabled(level) {
+		stack[0] = 1
+	} else {
+		stack[0] = 0
+	}
+}
+
+func zapCoreWithFn(ctx context.Context, mod api.Module, stack []uint64) {
+	// Read the logger from the context
+	logger := paramsFromContext(ctx).Logger
+
+	// Read the fields from the stack
+	buf := uint32(stack[0])
+	size := uint32(stack[1])
+
+	// Read the fields from WASM memory
+	fieldsBytes, ok := mod.Memory().Read(buf, size)
+	if !ok {
+		panic("out of memory reading fields") // Bug: caller passed a length outside memory
+	}
+
+	// Unmarshal the fields
+	var fields Fields
+	if err := json.Unmarshal(fieldsBytes, &fields); err != nil {
+		panic(err) // Bug: in unmarshaller
+	}
+
+	// Create a new logger with the fields
+	newLogger := logger.With(fields.ZapCoreFields())
+
+	// Store the new logger in the context
+	paramsFromContext(ctx).Logger = newLogger
+}
+
+func zapCoreCheckFn(ctx context.Context, mod api.Module, stack []uint64) {
+}
+
+func zapCoreWriteFn(ctx context.Context, mod api.Module, stack []uint64) {
+	// Read the logger from the context
+	logger := paramsFromContext(ctx).Logger
+
+	// Read buffer pointer and size from the stack
+	buf := uint32(stack[0])
+	size := uint32(stack[1])
+
+	// Read the serialized entry from WASM memory
+	entryBytes, ok := mod.Memory().Read(buf, size)
+	if !ok {
+		panic("out of memory reading entry") // Bug: caller passed a length outside memory
+	}
+
+	// Unmarshal the entry
+	var entry zapcore.Entry
+	if err := json.Unmarshal(entryBytes, &entry); err != nil {
+		panic(err) // Bug: in unmarshaller
+	}
+
+	// Write the entry to the logger
+	if err := logger.Write(entry, nil); err != nil {
+		panic(err) // Bug: in logger write
+	}
+}
+
+func zapCoreSyncFn(ctx context.Context, mod api.Module, stack []uint64) {
+	// Read the logger from the context
+	logger := paramsFromContext(ctx).Logger
+
+	// Sync the logger
+	if err := logger.Sync(); err != nil {
+		// TODO: Handle error properly
+		panic(err) // Bug: in logger sync
+	}
 }
 
 // instantiateHostModule creates and instantiates the host module with exported functions
