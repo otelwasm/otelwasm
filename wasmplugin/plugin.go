@@ -37,6 +37,7 @@ const (
 	getPluginConfig       = "getPluginConfig"
 	setResultStatusReason = "setResultStatusReason"
 	getShutdownRequested  = "getShutdownRequested"
+	logMessage            = "logMessage"
 
 	// Guest function
 	getSupportedTelemetry = "getSupportedTelemetry"
@@ -457,6 +458,72 @@ func setResultStatusReasonFn(ctx context.Context, mod api.Module, stack []uint64
 	paramsFromContext(ctx).StatusReason = string(reasonBytes)
 }
 
+func logMessageFn(ctx context.Context, mod api.Module, stack []uint64) {
+	// Read parameters from the stack
+	level := int32(stack[0])
+	buf := uint32(stack[1])
+	size := uint32(stack[2])
+
+	// Read the log message from WASM memory
+	messageBytes, ok := mod.Memory().Read(buf, size)
+	if !ok {
+		panic("out of memory reading log message") // Bug: caller passed a length outside memory
+	}
+
+	// Parse the JSON log message
+	var logEntry LogEntry
+	if err := json.Unmarshal(messageBytes, &logEntry); err != nil {
+		fmt.Fprintf(os.Stderr, "wasm: failed to parse log message: %v\n", err)
+		return
+	}
+
+	// Set the log level
+	logEntry.Level = LogLevel(level)
+
+	// Print the structured log message
+	// For now, we'll use a simple JSON format to stdout
+	// In a real implementation, this would integrate with the host's logging system
+	logJSON, err := json.Marshal(logEntry)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "wasm: failed to marshal log entry: %v\n", err)
+		return
+	}
+
+	fmt.Printf("WASM[%s]: %s\n", logEntry.Level.String(), string(logJSON))
+}
+
+// LogLevel represents the log level for structured logging
+type LogLevel int32
+
+const (
+	LogLevelDebug LogLevel = 0
+	LogLevelInfo  LogLevel = 1
+	LogLevelWarn  LogLevel = 2
+	LogLevelError LogLevel = 3
+)
+
+func (l LogLevel) String() string {
+	switch l {
+	case LogLevelDebug:
+		return "DEBUG"
+	case LogLevelInfo:
+		return "INFO"
+	case LogLevelWarn:
+		return "WARN"
+	case LogLevelError:
+		return "ERROR"
+	default:
+		return "UNKNOWN"
+	}
+}
+
+// LogEntry represents a structured log entry
+type LogEntry struct {
+	Level   LogLevel               `json:"level"`
+	Message string                 `json:"message"`
+	Fields  map[string]interface{} `json:"fields,omitempty"`
+}
+
 // instantiateHostModule creates and instantiates the host module with exported functions
 func instantiateHostModule(ctx context.Context, runtime wazero.Runtime) (api.Module, error) {
 	return runtime.NewHostModuleBuilder(otelWasm).
@@ -487,6 +554,9 @@ func instantiateHostModule(ctx context.Context, runtime wazero.Runtime) (api.Mod
 		NewFunctionBuilder().
 		WithGoModuleFunction(api.GoModuleFunc(getShutdownRequestedFn), []api.ValueType{}, []api.ValueType{api.ValueTypeI32}).
 		Export(getShutdownRequested).
+		NewFunctionBuilder().
+		WithGoModuleFunction(api.GoModuleFunc(logMessageFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{}).
+		WithParameterNames("level", "buf", "buf_len").Export(logMessage).
 		Instantiate(ctx)
 }
 
