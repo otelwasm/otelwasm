@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/otelwasm/otelwasm/wasmplugin"
-	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/pdata/plog"
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.opentelemetry.io/collector/pdata/ptrace"
@@ -20,13 +19,12 @@ const (
 )
 
 type wasmExporter struct {
-	plugin            *wasmplugin.WasmPlugin
-	logger            *zap.Logger
-	telemetrySettings component.TelemetrySettings
+	plugin *wasmplugin.WasmPlugin
+	logger *zap.Logger
 }
 
 // newWasmTracesExporter creates a new traces exporter using WebAssembly
-func newWasmTracesExporter(ctx context.Context, cfg *Config, telemetrySettings component.TelemetrySettings) (*wasmExporter, error) {
+func newWasmTracesExporter(ctx context.Context, cfg *Config, logger *zap.Logger) (*wasmExporter, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
@@ -48,14 +46,13 @@ func newWasmTracesExporter(ctx context.Context, cfg *Config, telemetrySettings c
 	}
 
 	return &wasmExporter{
-		plugin:            plugin,
-		logger:            telemetrySettings.Logger,
-		telemetrySettings: telemetrySettings,
+		plugin: plugin,
+		logger: logger,
 	}, nil
 }
 
 // newWasmMetricsExporter creates a new metrics exporter using WebAssembly
-func newWasmMetricsExporter(ctx context.Context, cfg *Config, telemetrySettings component.TelemetrySettings) (*wasmExporter, error) {
+func newWasmMetricsExporter(ctx context.Context, cfg *Config, logger *zap.Logger) (*wasmExporter, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
@@ -77,14 +74,13 @@ func newWasmMetricsExporter(ctx context.Context, cfg *Config, telemetrySettings 
 	}
 
 	return &wasmExporter{
-		plugin:            plugin,
-		logger:            telemetrySettings.Logger,
-		telemetrySettings: telemetrySettings,
+		plugin: plugin,
+		logger: logger,
 	}, nil
 }
 
 // newWasmLogsExporter creates a new logs exporter using WebAssembly
-func newWasmLogsExporter(ctx context.Context, cfg *Config, telemetrySettings component.TelemetrySettings) (*wasmExporter, error) {
+func newWasmLogsExporter(ctx context.Context, cfg *Config, logger *zap.Logger) (*wasmExporter, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
@@ -106,9 +102,8 @@ func newWasmLogsExporter(ctx context.Context, cfg *Config, telemetrySettings com
 	}
 
 	return &wasmExporter{
-		plugin:            plugin,
-		logger:            telemetrySettings.Logger,
-		telemetrySettings: telemetrySettings,
+		plugin: plugin,
+		logger: logger,
 	}, nil
 }
 
@@ -117,10 +112,9 @@ func (wp *wasmExporter) pushTraces(
 	td ptrace.Traces,
 ) error {
 	stack := &wasmplugin.Stack{
-		CurrentTraces:     td,
-		PluginConfigJSON:  wp.plugin.PluginConfigJSON,
-		Logger:            wp.logger,
-		TelemetrySettings: wp.telemetrySettings,
+		CurrentTraces:    td,
+		PluginConfigJSON: wp.plugin.PluginConfigJSON,
+		Logger:           wp.logger,
 	}
 
 	res, err := wp.plugin.ProcessFunctionCall(ctx, pushTracesFunctionName, stack)
@@ -141,10 +135,9 @@ func (wp *wasmExporter) pushMetrics(
 	md pmetric.Metrics,
 ) error {
 	stack := &wasmplugin.Stack{
-		CurrentMetrics:    md,
-		PluginConfigJSON:  wp.plugin.PluginConfigJSON,
-		Logger:            wp.logger,
-		TelemetrySettings: wp.telemetrySettings,
+		CurrentMetrics:   md,
+		PluginConfigJSON: wp.plugin.PluginConfigJSON,
+		Logger:           wp.logger,
 	}
 
 	res, err := wp.plugin.ProcessFunctionCall(ctx, pushMetricsFunctionName, stack)
@@ -165,10 +158,9 @@ func (wp *wasmExporter) pushLogs(
 	ld plog.Logs,
 ) error {
 	stack := &wasmplugin.Stack{
-		CurrentLogs:       ld,
-		PluginConfigJSON:  wp.plugin.PluginConfigJSON,
-		Logger:            wp.logger,
-		TelemetrySettings: wp.telemetrySettings,
+		CurrentLogs:      ld,
+		PluginConfigJSON: wp.plugin.PluginConfigJSON,
+		Logger:           wp.logger,
 	}
 
 	res, err := wp.plugin.ProcessFunctionCall(ctx, pushLogsFunctionName, stack)

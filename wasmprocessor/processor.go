@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/otelwasm/otelwasm/wasmplugin"
-	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/pdata/plog"
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.opentelemetry.io/collector/pdata/ptrace"
@@ -20,12 +19,11 @@ const (
 )
 
 type wasmProcessor struct {
-	plugin            *wasmplugin.WasmPlugin
-	logger            *zap.Logger
-	telemetrySettings component.TelemetrySettings
+	plugin *wasmplugin.WasmPlugin
+	logger *zap.Logger
 }
 
-func newWasmMetricsProcessor(ctx context.Context, cfg *Config, telemetrySettings component.TelemetrySettings) (*wasmProcessor, error) {
+func newWasmMetricsProcessor(ctx context.Context, cfg *Config, logger *zap.Logger) (*wasmProcessor, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
@@ -46,13 +44,12 @@ func newWasmMetricsProcessor(ctx context.Context, cfg *Config, telemetrySettings
 	}
 
 	return &wasmProcessor{
-		plugin:            plugin,
-		logger:            telemetrySettings.Logger,
-		telemetrySettings: telemetrySettings,
+		plugin: plugin,
+		logger: logger,
 	}, nil
 }
 
-func newWasmLogsProcessor(ctx context.Context, cfg *Config, telemetrySettings component.TelemetrySettings) (*wasmProcessor, error) {
+func newWasmLogsProcessor(ctx context.Context, cfg *Config, logger *zap.Logger) (*wasmProcessor, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
@@ -73,13 +70,12 @@ func newWasmLogsProcessor(ctx context.Context, cfg *Config, telemetrySettings co
 	}
 
 	return &wasmProcessor{
-		plugin:            plugin,
-		logger:            telemetrySettings.Logger,
-		telemetrySettings: telemetrySettings,
+		plugin: plugin,
+		logger: logger,
 	}, nil
 }
 
-func newWasmTracesProcessor(ctx context.Context, cfg *Config, telemetrySettings component.TelemetrySettings) (*wasmProcessor, error) {
+func newWasmTracesProcessor(ctx context.Context, cfg *Config, logger *zap.Logger) (*wasmProcessor, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
@@ -100,9 +96,8 @@ func newWasmTracesProcessor(ctx context.Context, cfg *Config, telemetrySettings 
 	}
 
 	return &wasmProcessor{
-		plugin:            plugin,
-		logger:            telemetrySettings.Logger,
-		telemetrySettings: telemetrySettings,
+		plugin: plugin,
+		logger: logger,
 	}, nil
 }
 
@@ -111,10 +106,9 @@ func (wp *wasmProcessor) processTraces(
 	td ptrace.Traces,
 ) (ptrace.Traces, error) {
 	stack := &wasmplugin.Stack{
-		CurrentTraces:     td,
-		PluginConfigJSON:  wp.plugin.PluginConfigJSON,
-		Logger:            wp.logger,
-		TelemetrySettings: wp.telemetrySettings,
+		CurrentTraces:    td,
+		PluginConfigJSON: wp.plugin.PluginConfigJSON,
+		Logger:           wp.logger,
 	}
 
 	res, err := wp.plugin.ProcessFunctionCall(ctx, processTracesFunctionName, stack)
@@ -135,10 +129,9 @@ func (wp *wasmProcessor) processMetrics(
 	md pmetric.Metrics,
 ) (pmetric.Metrics, error) {
 	stack := &wasmplugin.Stack{
-		CurrentMetrics:    md,
-		PluginConfigJSON:  wp.plugin.PluginConfigJSON,
-		Logger:            wp.logger,
-		TelemetrySettings: wp.telemetrySettings,
+		CurrentMetrics:   md,
+		PluginConfigJSON: wp.plugin.PluginConfigJSON,
+		Logger:           wp.logger,
 	}
 
 	res, err := wp.plugin.ProcessFunctionCall(ctx, processMetricsFunctionName, stack)
@@ -159,10 +152,9 @@ func (wp *wasmProcessor) processLogs(
 	ld plog.Logs,
 ) (plog.Logs, error) {
 	stack := &wasmplugin.Stack{
-		CurrentLogs:       ld,
-		PluginConfigJSON:  wp.plugin.PluginConfigJSON,
-		Logger:            wp.logger,
-		TelemetrySettings: wp.telemetrySettings,
+		CurrentLogs:      ld,
+		PluginConfigJSON: wp.plugin.PluginConfigJSON,
+		Logger:           wp.logger,
 	}
 
 	res, err := wp.plugin.ProcessFunctionCall(ctx, processLogsFunctionName, stack)
