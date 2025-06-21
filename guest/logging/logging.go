@@ -13,7 +13,7 @@ import (
 // Extended log levels beyond slog to support Zap's additional levels
 const (
 	LevelDPanic slog.Level = slog.LevelError + 1 // 9
-	LevelPanic  slog.Level = slog.LevelError + 2 // 10  
+	LevelPanic  slog.Level = slog.LevelError + 2 // 10
 	LevelFatal  slog.Level = slog.LevelError + 3 // 11
 )
 
