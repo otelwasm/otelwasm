@@ -4,19 +4,18 @@ import (
 	"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/awss3exporter"
 	"github.com/otelwasm/otelwasm/guest/api"
 	"github.com/otelwasm/otelwasm/guest/factoryconnector"
-	"github.com/otelwasm/otelwasm/guest/logging"
 	"github.com/otelwasm/otelwasm/guest/plugin" // register exporters
-	"github.com/otelwasm/otelwasm/guest/telemetry"
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/component/componenttest"
 	"go.opentelemetry.io/collector/exporter"
+	"go.uber.org/zap"
 )
 
 func init() {
-	logging.Info("Initializing AWS S3 exporter plugin")
-
-	// Use host bridge logger instead of creating a new zap logger
-	logger := logging.NewHostBridgeLogger()
+	logger, err := zap.NewProduction()
+	if err != nil {
+		panic(err)
+	}
 
 	factory := awss3exporter.NewFactory()
 	telemetrySettings := componenttest.NewNopTelemetrySettings()
@@ -38,14 +37,6 @@ func init() {
 		connector.Metrics(),
 		connector.Logs(),
 		connector.Traces(),
-	})
-
-	// Log telemetry settings
-	serviceName := telemetry.GetServiceName()
-	logging.Info("AWS S3 exporter plugin initialized successfully", map[string]string{
-		"exporter_id":    "awss3",
-		"supports":       "traces,metrics,logs", 
-		"service_name":   serviceName,
 	})
 }
 func main() {}

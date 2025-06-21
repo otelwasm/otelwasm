@@ -16,9 +16,13 @@ import (
 	"github.com/stealthrocket/wazergo"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	"go.opentelemetry.io/collector/component"
+	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/plog"
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.opentelemetry.io/collector/pdata/ptrace"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -41,6 +45,7 @@ const (
 	setResultStatusReason = "setResultStatusReason"
 	getShutdownRequested  = "getShutdownRequested"
 	logMessage            = "logMessage"
+	getTelemetrySettings  = "getTelemetrySettings"
 
 	// Guest function
 	getSupportedTelemetry = "getSupportedTelemetry"
@@ -125,14 +130,14 @@ type Stack struct {
 
 	// Logger is the host-side logger for the WASM plugin
 	Logger *zap.Logger
+
+	// TelemetrySettings contains the complete telemetry settings for the component
+	TelemetrySettings component.TelemetrySettings
 }
 
 // paramsFromContext retrieves the Stack from the context
 func paramsFromContext(ctx context.Context) *Stack {
-	if stack, ok := ctx.Value(stackKey{}).(*Stack); ok {
-		return stack
-	}
-	return nil
+	return ctx.Value(stackKey{}).(*Stack)
 }
 
 // NewWasmPlugin creates a new WasmPlugin instance
@@ -336,6 +341,17 @@ type LogMessage struct {
 	Fields  map[string]string `json:"fields"`
 }
 
+// SerializableTelemetrySettings represents telemetry settings that can be serialized to WASM
+type SerializableTelemetrySettings struct {
+	// Resource attributes as a map
+	ResourceAttributes map[string]interface{} `json:"resource_attributes"`
+	// Service name extracted from resource
+	ServiceName string `json:"service_name"`
+	// Service version extracted from resource  
+	ServiceVersion string `json:"service_version"`
+	// Component ID information
+	ComponentID map[string]string `json:"component_id"`
+}
 
 // zapLevelFromSlogLevel converts slog.Level to zapcore.Level
 func zapLevelFromSlogLevel(level slog.Level) zapcore.Level {
@@ -367,19 +383,18 @@ func logMessageFn(ctx context.Context, mod api.Module, stack []uint64) {
 	var logMsg LogMessage
 	if err := json.Unmarshal(logBytes, &logMsg); err != nil {
 		// If we can't unmarshal, log the raw message as a fallback
-		if wasmStack := paramsFromContext(ctx); wasmStack != nil && wasmStack.Logger != nil {
-			wasmStack.Logger.Error("failed to unmarshal log message from guest", zap.String("raw_message", string(logBytes)), zap.Error(err))
+		if logger := paramsFromContext(ctx).Logger; logger != nil {
+			logger.Error("failed to unmarshal log message from guest", zap.String("raw_message", string(logBytes)), zap.Error(err))
 		}
 		return
 	}
 
 	// Get the logger from context
-	wasmStack := paramsFromContext(ctx)
-	if wasmStack == nil || wasmStack.Logger == nil {
-		// No stack or logger available, skip logging
+	logger := paramsFromContext(ctx).Logger
+	if logger == nil {
+		// No logger available, skip logging
 		return
 	}
-	logger := wasmStack.Logger
 
 	// Convert slog level to zap level
 	zapLevel := zapLevelFromSlogLevel(slog.Level(logMsg.Level))
@@ -405,6 +420,63 @@ func logMessageFn(ctx context.Context, mod api.Module, stack []uint64) {
 	}
 }
 
+// telemetrySettingsToSerializable converts component.TelemetrySettings to SerializableTelemetrySettings
+func telemetrySettingsToSerializable(ts component.TelemetrySettings) SerializableTelemetrySettings {
+	serializable := SerializableTelemetrySettings{
+		ResourceAttributes: make(map[string]interface{}),
+		ComponentID:        make(map[string]string),
+	}
+
+	// Extract resource attributes
+	if ts.Resource.Len() > 0 {
+		ts.Resource.Attributes().Range(func(k string, v pcommon.Value) bool {
+			switch v.Type() {
+			case pcommon.ValueTypeStr:
+				serializable.ResourceAttributes[k] = v.Str()
+			case pcommon.ValueTypeInt:
+				serializable.ResourceAttributes[k] = v.Int()
+			case pcommon.ValueTypeBool:
+				serializable.ResourceAttributes[k] = v.Bool()
+			case pcommon.ValueTypeDouble:
+				serializable.ResourceAttributes[k] = v.Double()
+			default:
+				serializable.ResourceAttributes[k] = v.AsString()
+			}
+
+			// Extract specific service attributes
+			switch k {
+			case "service.name":
+				if v.Type() == pcommon.ValueTypeStr {
+					serializable.ServiceName = v.Str()
+				}
+			case "service.version":
+				if v.Type() == pcommon.ValueTypeStr {
+					serializable.ServiceVersion = v.Str()
+				}
+			}
+			return true
+		})
+	}
+
+	return serializable
+}
+
+func getTelemetrySettingsFn(ctx context.Context, mod api.Module, stack []uint64) {
+	buf := uint32(stack[0])
+	bufLimit := uint32(stack[1])
+
+	telemetrySettings := paramsFromContext(ctx).TelemetrySettings
+	serializable := telemetrySettingsToSerializable(telemetrySettings)
+
+	// Marshal to JSON
+	jsonBytes, err := json.Marshal(serializable)
+	if err != nil {
+		// If marshaling fails, write empty object
+		jsonBytes = []byte("{}")
+	}
+
+	stack[0] = uint64(writeBytesIfUnderLimit(mod.Memory(), jsonBytes, buf, bufLimit))
+}
 
 func currentTracesFn(ctx context.Context, mod api.Module, stack []uint64) {
 	buf := uint32(stack[0])
@@ -576,6 +648,9 @@ func instantiateHostModule(ctx context.Context, runtime wazero.Runtime) (api.Mod
 		NewFunctionBuilder().
 		WithGoModuleFunction(api.GoModuleFunc(logMessageFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{}).
 		WithParameterNames("buf", "buf_len").Export(logMessage).
+		NewFunctionBuilder().
+		WithGoModuleFunction(api.GoModuleFunc(getTelemetrySettingsFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{api.ValueTypeI32}).
+		WithParameterNames("buf", "buf_limit").Export(getTelemetrySettings).
 		Instantiate(ctx)
 }
 

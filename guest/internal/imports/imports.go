@@ -21,3 +21,6 @@ func getShutdownRequested() uint32
 
 //go:wasmimport opentelemetry.io/wasm logMessage
 func logMessage(ptr, size uint32)
+
+//go:wasmimport opentelemetry.io/wasm getTelemetrySettings
+func getTelemetrySettings(ptr uint32, limit mem.BufLimit) (len uint32)

@@ -4,18 +4,18 @@ import (
 	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awss3receiver"
 	"github.com/otelwasm/otelwasm/guest/api"
 	"github.com/otelwasm/otelwasm/guest/factoryconnector"
-	"github.com/otelwasm/otelwasm/guest/logging"
 	"github.com/otelwasm/otelwasm/guest/plugin" // register receivers
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/component/componenttest"
 	"go.opentelemetry.io/collector/receiver"
+	"go.uber.org/zap"
 )
 
 func init() {
-	logging.Info("Initializing AWS S3 receiver plugin")
-
-	// Use host bridge logger instead of creating a new zap logger
-	logger := logging.NewHostBridgeLogger()
+	logger, err := zap.NewProduction()
+	if err != nil {
+		panic(err)
+	}
 
 	factory := awss3receiver.NewFactory()
 	telemetrySettings := componenttest.NewNopTelemetrySettings()
@@ -37,11 +37,6 @@ func init() {
 		connector.Metrics(),
 		connector.Logs(),
 		connector.Traces(),
-	})
-
-	logging.Info("AWS S3 receiver plugin initialized successfully", map[string]string{
-		"receiver_id": "awss3",
-		"supports":    "traces,metrics,logs",
 	})
 }
 func main() {}

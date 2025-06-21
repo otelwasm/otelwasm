@@ -112,7 +112,7 @@ func TestProcessTracesWithNopProcessor(t *testing.T) {
 	cfg := createDefaultConfig().(*Config)
 	cfg.Path = "testdata/nop/main.wasm"
 	ctx := t.Context()
-	wasmProc, err := newWasmTracesProcessor(ctx, cfg, componenttest.NewNopTelemetrySettings().Logger)
+	wasmProc, err := newWasmTracesProcessor(ctx, cfg)
 	if err != nil {
 		t.Fatalf("failed to create wasm processor: %v", err)
 	}
@@ -160,7 +160,7 @@ func TestProcessTracesWithCurlProcessor(t *testing.T) {
 	cfg := createDefaultConfig().(*Config)
 	cfg.Path = "testdata/curl/main.wasm"
 	ctx := t.Context()
-	wasmProc, err := newWasmTracesProcessor(ctx, cfg, componenttest.NewNopTelemetrySettings().Logger)
+	wasmProc, err := newWasmTracesProcessor(ctx, cfg)
 	if err != nil {
 		t.Fatalf("failed to create wasm processor: %v", err)
 	}
@@ -187,7 +187,7 @@ func TestProcessMetricsWithNopProcessor(t *testing.T) {
 	cfg := createDefaultConfig().(*Config)
 	cfg.Path = "testdata/nop/main.wasm"
 	ctx := t.Context()
-	wasmProc, err := newWasmMetricsProcessor(ctx, cfg, componenttest.NewNopTelemetrySettings().Logger)
+	wasmProc, err := newWasmMetricsProcessor(ctx, cfg)
 	if err != nil {
 		t.Fatalf("failed to create wasm processor: %v", err)
 	}
@@ -237,7 +237,7 @@ func TestProcessLogsWithNopProcessor(t *testing.T) {
 	cfg := createDefaultConfig().(*Config)
 	cfg.Path = "testdata/nop/main.wasm"
 	ctx := t.Context()
-	wasmProc, err := newWasmLogsProcessor(ctx, cfg, componenttest.NewNopTelemetrySettings().Logger)
+	wasmProc, err := newWasmLogsProcessor(ctx, cfg)
 	if err != nil {
 		t.Fatalf("failed to create wasm processor: %v", err)
 	}
@@ -291,7 +291,7 @@ func TestProcessTracesWithAddNewAttributeProcessor(t *testing.T) {
 		"attribute_value": "new-value",
 	}
 	ctx := t.Context()
-	wasmProc, err := newWasmTracesProcessor(ctx, cfg, componenttest.NewNopTelemetrySettings().Logger)
+	wasmProc, err := newWasmTracesProcessor(ctx, cfg)
 	if err != nil {
 		t.Fatalf("failed to create wasm processor: %v", err)
 	}
