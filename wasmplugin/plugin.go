@@ -334,6 +334,7 @@ type LogMessage struct {
 }
 
 // zapLevelFromSlogLevel converts slog.Level to zapcore.Level
+// Supports extended levels beyond standard slog for Zap compatibility
 func zapLevelFromSlogLevel(level slog.Level) zapcore.Level {
 	switch {
 	case level <= slog.LevelDebug:
@@ -342,6 +343,14 @@ func zapLevelFromSlogLevel(level slog.Level) zapcore.Level {
 		return zapcore.InfoLevel
 	case level <= slog.LevelWarn:
 		return zapcore.WarnLevel
+	case level <= slog.LevelError:
+		return zapcore.ErrorLevel
+	case level == slog.LevelError+1: // LevelDPanic
+		return zapcore.DPanicLevel
+	case level == slog.LevelError+2: // LevelPanic
+		return zapcore.PanicLevel
+	case level == slog.LevelError+3: // LevelFatal
+		return zapcore.FatalLevel
 	default:
 		return zapcore.ErrorLevel
 	}
@@ -395,6 +404,12 @@ func logMessageFn(ctx context.Context, mod api.Module, stack []uint64) {
 		logger.Warn(logMsg.Message, fields...)
 	case zapcore.ErrorLevel:
 		logger.Error(logMsg.Message, fields...)
+	case zapcore.DPanicLevel:
+		logger.DPanic(logMsg.Message, fields...)
+	case zapcore.PanicLevel:
+		logger.Panic(logMsg.Message, fields...)
+	case zapcore.FatalLevel:
+		logger.Fatal(logMsg.Message, fields...)
 	default:
 		logger.Info(logMsg.Message, fields...)
 	}

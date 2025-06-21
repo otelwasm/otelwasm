@@ -67,6 +67,39 @@ func TestLogMessageFn(t *testing.T) {
 			expectedFields: map[string]string{"key4": "value4"},
 		},
 		{
+			name: "dpanic message",
+			logMessage: LogMessage{
+				Level:   int32(9), // LevelDPanic
+				Message: "dpanic message",
+				Fields:  map[string]string{"key5": "value5"},
+			},
+			expectedLevel:  zapcore.DPanicLevel,
+			expectedMsg:    "dpanic message",
+			expectedFields: map[string]string{"key5": "value5"},
+		},
+		{
+			name: "panic message",
+			logMessage: LogMessage{
+				Level:   int32(10), // LevelPanic
+				Message: "panic message",
+				Fields:  map[string]string{"key6": "value6"},
+			},
+			expectedLevel:  zapcore.PanicLevel,
+			expectedMsg:    "panic message",
+			expectedFields: map[string]string{"key6": "value6"},
+		},
+		{
+			name: "fatal message",
+			logMessage: LogMessage{
+				Level:   int32(11), // LevelFatal
+				Message: "fatal message",
+				Fields:  map[string]string{"key7": "value7"},
+			},
+			expectedLevel:  zapcore.FatalLevel,
+			expectedMsg:    "fatal message",
+			expectedFields: map[string]string{"key7": "value7"},
+		},
+		{
 			name: "message without fields",
 			logMessage: LogMessage{
 				Level:   int32(0), // slog.LevelInfo
@@ -227,6 +260,9 @@ func TestZapLevelFromSlogLevel(t *testing.T) {
 		{"info level", 0, zapcore.InfoLevel},
 		{"warn level", 4, zapcore.WarnLevel},
 		{"error level", 8, zapcore.ErrorLevel},
+		{"dpanic level", 9, zapcore.DPanicLevel},
+		{"panic level", 10, zapcore.PanicLevel},
+		{"fatal level", 11, zapcore.FatalLevel},
 		{"very high level", 100, zapcore.ErrorLevel},
 		{"very low level", -100, zapcore.DebugLevel},
 	}

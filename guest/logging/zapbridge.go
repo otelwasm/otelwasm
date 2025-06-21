@@ -43,7 +43,7 @@ func (c *hostBridgeCore) Check(entry zapcore.Entry, checkedEntry *zapcore.Checke
 
 // Write serializes the Entry and any Fields supplied at the log site and writes them to the host
 func (c *hostBridgeCore) Write(entry zapcore.Entry, fields []zapcore.Field) error {
-	// Convert zap level to slog level
+	// Convert zap level to our extended slog level
 	var slogLevel slog.Level
 	switch entry.Level {
 	case zapcore.DebugLevel:
@@ -52,8 +52,14 @@ func (c *hostBridgeCore) Write(entry zapcore.Entry, fields []zapcore.Field) erro
 		slogLevel = slog.LevelInfo
 	case zapcore.WarnLevel:
 		slogLevel = slog.LevelWarn
-	case zapcore.ErrorLevel, zapcore.DPanicLevel, zapcore.PanicLevel, zapcore.FatalLevel:
+	case zapcore.ErrorLevel:
 		slogLevel = slog.LevelError
+	case zapcore.DPanicLevel:
+		slogLevel = LevelDPanic
+	case zapcore.PanicLevel:
+		slogLevel = LevelPanic
+	case zapcore.FatalLevel:
+		slogLevel = LevelFatal
 	default:
 		slogLevel = slog.LevelInfo
 	}

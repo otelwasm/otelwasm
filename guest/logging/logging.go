@@ -10,6 +10,13 @@ import (
 	"github.com/otelwasm/otelwasm/guest/internal/mem"
 )
 
+// Extended log levels beyond slog to support Zap's additional levels
+const (
+	LevelDPanic slog.Level = slog.LevelError + 1 // 9
+	LevelPanic  slog.Level = slog.LevelError + 2 // 10  
+	LevelFatal  slog.Level = slog.LevelError + 3 // 11
+)
+
 // LogMessage represents a structured log message to be sent to the host
 type LogMessage struct {
 	Level   int32             `json:"level"`
