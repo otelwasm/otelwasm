@@ -6,7 +6,6 @@ import (
 	"github.com/otelwasm/otelwasm/guest/api"
 	"github.com/otelwasm/otelwasm/guest/logging"
 	"github.com/otelwasm/otelwasm/guest/plugin"
-	"github.com/otelwasm/otelwasm/guest/telemetry"
 	"go.opentelemetry.io/collector/pdata/plog"
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.opentelemetry.io/collector/pdata/ptrace"
@@ -15,15 +14,9 @@ import (
 type loggingProcessor struct{}
 
 func (p *loggingProcessor) ProcessTraces(traces ptrace.Traces) (ptrace.Traces, *api.Status) {
-	// Get telemetry settings from host
-	serviceName := telemetry.GetServiceName()
-	serviceVersion := telemetry.GetServiceVersion()
-	
 	logging.Info("Processing traces", map[string]string{
-		"trace_count":     string(rune(traces.SpanCount())),
-		"component":       "logging_example_processor",
-		"service_name":    serviceName,
-		"service_version": serviceVersion,
+		"trace_count": string(rune(traces.SpanCount())),
+		"component":   "logging_example_processor",
 	})
 
 	// Log details about each trace
@@ -143,25 +136,6 @@ func (p *loggingProcessor) ProcessLogs(logs plog.Logs) (plog.Logs, *api.Status) 
 
 func init() {
 	logging.Info("Initializing logging example processor")
-
-	// Get telemetry settings to demonstrate usage
-	serviceName := telemetry.GetServiceName()
-	allAttrs := telemetry.GetAllResourceAttributes()
-	
-	logging.Info("Telemetry settings retrieved", map[string]string{
-		"service_name":       serviceName,
-		"resource_attr_count": string(rune(len(allAttrs))),
-	})
-
-	// Log some resource attributes if available
-	for key, value := range allAttrs {
-		if str, ok := value.(string); ok {
-			logging.Debug("Resource attribute", map[string]string{
-				"key":   key,
-				"value": str,
-			})
-		}
-	}
 
 	// Register the processor for all telemetry types
 	plugin.Set(struct {

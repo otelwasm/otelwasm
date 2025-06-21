@@ -3,12 +3,13 @@ package main
 import (
 	"github.com/otelwasm/otelwasm/guest/api"
 	"github.com/otelwasm/otelwasm/guest/factoryconnector"
+	"github.com/otelwasm/otelwasm/guest/logging"
 	"github.com/otelwasm/otelwasm/guest/plugin" // register exporters
+	"github.com/otelwasm/otelwasm/guest/telemetry"
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/component/componenttest"
 	"go.opentelemetry.io/collector/exporter"
 	"go.opentelemetry.io/collector/exporter/otlphttpexporter"
-	"go.uber.org/zap"
 )
 
 // TODO: Fix the bug when we use sending queue on exporter.
@@ -29,10 +30,12 @@ import (
 // For more details, see https://github.com/otelwasm/otelwasm/issues/60
 
 func init() {
-	logger, err := zap.NewDevelopment()
-	if err != nil {
-		panic(err)
-	}
+	// Log exporter initialization
+	logging.Info("Initializing OTLP HTTP exporter plugin")
+
+	// Use host bridge logger instead of creating a new zap logger
+	// This ensures all logging goes through the host-side logger
+	logger := logging.NewHostBridgeLogger()
 
 	factory := otlphttpexporter.NewFactory()
 	telemetrySettings := componenttest.NewNopTelemetrySettings()
@@ -54,6 +57,15 @@ func init() {
 		connector.Metrics(),
 		connector.Logs(),
 		connector.Traces(),
+	})
+
+	// Get telemetry settings from host to enrich logging
+	serviceName := telemetry.GetServiceName()
+	
+	logging.Info("OTLP HTTP exporter plugin initialized successfully", map[string]string{
+		"exporter_id": "otlphttp",
+		"supports":    "traces,metrics,logs",
+		"service_name": serviceName,
 	})
 }
 

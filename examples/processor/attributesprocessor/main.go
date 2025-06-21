@@ -6,24 +6,18 @@ import (
 	"github.com/otelwasm/otelwasm/guest/factoryconnector"
 	"github.com/otelwasm/otelwasm/guest/logging"
 	"github.com/otelwasm/otelwasm/guest/plugin" // register processors
-	"github.com/otelwasm/otelwasm/guest/telemetry"
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/component/componenttest"
 	"go.opentelemetry.io/collector/processor"
-	"go.uber.org/zap"
 )
 
 func init() {
 	// Log processor initialization
 	logging.Info("Initializing attributes processor plugin")
 
-	logger, err := zap.NewDevelopment()
-	if err != nil {
-		logging.Error("Failed to create logger", map[string]string{
-			"error": err.Error(),
-		})
-		panic(err)
-	}
+	// Use host bridge logger instead of creating a new zap logger
+	// This ensures all logging goes through the host-side logger
+	logger := logging.NewHostBridgeLogger()
 
 	// Create the factory from the upstream implementation
 	factory := attributesprocessor.NewFactory()
@@ -50,24 +44,10 @@ func init() {
 		connector.Traces(),
 	})
 
-	// Get telemetry settings from host to enrich logging
-	serviceName := telemetry.GetServiceName()
-	serviceVersion := telemetry.GetServiceVersion()
-	
 	logging.Info("Attributes processor plugin initialized successfully", map[string]string{
-		"processor_id":    "attributes",
-		"supports":        "traces,metrics,logs",
-		"service_name":    serviceName,
-		"service_version": serviceVersion,
+		"processor_id": "attributes",
+		"supports":     "traces,metrics,logs",
 	})
-
-	// Log resource attributes for debugging
-	attrs := telemetry.GetAllResourceAttributes()
-	if len(attrs) > 0 {
-		logging.Debug("Resource attributes available", map[string]string{
-			"attribute_count": string(rune(len(attrs))),
-		})
-	}
 }
 
 func main() {}

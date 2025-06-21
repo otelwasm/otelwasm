@@ -148,7 +148,6 @@ func (r *Receiver) Start(ctx context.Context, host component.Host) error {
 		OnResultTracesChange:  onResultTracesChange,
 		PluginConfigJSON:      r.plugin.PluginConfigJSON,
 		Logger:                r.set.Logger,
-		TelemetrySettings:     r.set.TelemetrySettings,
 	}
 
 	if r.nextConsumerM != nil {

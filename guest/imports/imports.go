@@ -16,6 +16,3 @@ func setResultLogs(ptr, size uint32)
 
 //go:wasmimport opentelemetry.io/wasm logMessage
 func logMessage(ptr, size uint32)
-
-//go:wasmimport opentelemetry.io/wasm getTelemetrySettings
-func getTelemetrySettings(ptr, size uint32) (len uint32)
