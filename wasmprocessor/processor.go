@@ -9,6 +9,7 @@ import (
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	"go.opentelemetry.io/collector/pipeline"
+	"go.uber.org/zap"
 )
 
 const (
@@ -19,9 +20,10 @@ const (
 
 type wasmProcessor struct {
 	plugin *wasmplugin.WasmPlugin
+	logger *zap.Logger
 }
 
-func newWasmMetricsProcessor(ctx context.Context, cfg *Config) (*wasmProcessor, error) {
+func newWasmMetricsProcessor(ctx context.Context, cfg *Config, logger *zap.Logger) (*wasmProcessor, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
@@ -43,10 +45,11 @@ func newWasmMetricsProcessor(ctx context.Context, cfg *Config) (*wasmProcessor, 
 
 	return &wasmProcessor{
 		plugin: plugin,
+		logger: logger,
 	}, nil
 }
 
-func newWasmLogsProcessor(ctx context.Context, cfg *Config) (*wasmProcessor, error) {
+func newWasmLogsProcessor(ctx context.Context, cfg *Config, logger *zap.Logger) (*wasmProcessor, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
@@ -68,10 +71,11 @@ func newWasmLogsProcessor(ctx context.Context, cfg *Config) (*wasmProcessor, err
 
 	return &wasmProcessor{
 		plugin: plugin,
+		logger: logger,
 	}, nil
 }
 
-func newWasmTracesProcessor(ctx context.Context, cfg *Config) (*wasmProcessor, error) {
+func newWasmTracesProcessor(ctx context.Context, cfg *Config, logger *zap.Logger) (*wasmProcessor, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
@@ -93,6 +97,7 @@ func newWasmTracesProcessor(ctx context.Context, cfg *Config) (*wasmProcessor, e
 
 	return &wasmProcessor{
 		plugin: plugin,
+		logger: logger,
 	}, nil
 }
 
@@ -103,6 +108,7 @@ func (wp *wasmProcessor) processTraces(
 	stack := &wasmplugin.Stack{
 		CurrentTraces:    td,
 		PluginConfigJSON: wp.plugin.PluginConfigJSON,
+		Logger:           wp.logger,
 	}
 
 	res, err := wp.plugin.ProcessFunctionCall(ctx, processTracesFunctionName, stack)
@@ -125,6 +131,7 @@ func (wp *wasmProcessor) processMetrics(
 	stack := &wasmplugin.Stack{
 		CurrentMetrics:   md,
 		PluginConfigJSON: wp.plugin.PluginConfigJSON,
+		Logger:           wp.logger,
 	}
 
 	res, err := wp.plugin.ProcessFunctionCall(ctx, processMetricsFunctionName, stack)
@@ -147,6 +154,7 @@ func (wp *wasmProcessor) processLogs(
 	stack := &wasmplugin.Stack{
 		CurrentLogs:      ld,
 		PluginConfigJSON: wp.plugin.PluginConfigJSON,
+		Logger:           wp.logger,
 	}
 
 	res, err := wp.plugin.ProcessFunctionCall(ctx, processLogsFunctionName, stack)
