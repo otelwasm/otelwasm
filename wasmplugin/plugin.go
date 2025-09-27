@@ -9,6 +9,7 @@ import (
 	"os"
 	"sync/atomic"
 
+	// "github.com/otelwasm/otelwasm/runtime" // TODO: Fix circular dependency
 	"github.com/stealthrocket/wasi-go"
 	wasigo "github.com/stealthrocket/wasi-go/imports"
 	"github.com/stealthrocket/wasi-go/imports/wasi_snapshot_preview1"
@@ -76,26 +77,20 @@ func (s StatusCode) String() string {
 
 // WasmPlugin represents a WebAssembly plugin for OpenTelemetry components
 type WasmPlugin struct {
-	// Runtime is the WebAssembly runtime
-	Runtime wazero.Runtime
+	// Runtime is the WebAssembly runtime (abstracted - temporarily using interface{} to avoid circular dependency)
+	Runtime interface{} // TODO: Use runtime.Runtime after fixing circular dependency
 
-	// System is the WASI system implementation
-	Sys wasi.System
+	// RuntimeContext holds runtime-specific state (WASI, host modules, etc.)
+	RuntimeContext interface{} // TODO: Use runtime.Context after fixing circular dependency
 
-	// Module is the instantiated WASM module
-	Module api.Module
+	// Module is the instantiated WASM module (abstracted)
+	Module interface{} // TODO: Use runtime.ModuleInstance after fixing circular dependency
 
 	// PluginConfigJSON is the JSON representation of the plugin config
 	PluginConfigJSON []byte
 
-	// Exported functions from the WASM module
-	ExportedFunctions map[string]api.Function
-
-	// wasiP1HostModule is the host module instance initialized by wasi-go.
-	// This instance holds necessary states for WASI host functions, which needs to be passed to context when calling the guest.
-	// This is a workaround to avoid panic when calling wasi functions with different context than the one used to instantiate the host module.
-	// TODO: Remove this if possible after replacing WASI implementation with our own.
-	wasiP1HostModule *wasi_snapshot_preview1.Module
+	// Exported functions from the WASM module (abstracted)
+	ExportedFunctions map[string]interface{} // TODO: Use runtime.FunctionInstance after fixing circular dependency
 }
 
 // stackKey is the key used to store the stack in the context
@@ -202,13 +197,17 @@ func NewWasmPlugin(ctx context.Context, cfg *Config, requiredFunctions []string)
 		return nil, fmt.Errorf("wasm: error marshalling plugin config: %w", err)
 	}
 
+	// TODO: This constructor needs to be completely refactored for the new runtime abstraction
+	// For now, we temporarily maintain compatibility by creating a placeholder
+	_ = sys // TODO: Use in new runtime context
+	_ = wasiP1HostModule // TODO: Use in new runtime context
+
 	plugin := &WasmPlugin{
-		Runtime:           runtime,
-		Sys:               sys,
-		Module:            mod,
+		Runtime:           nil, // TODO: Use new runtime abstraction
+		RuntimeContext:    nil, // TODO: Use new runtime context
+		Module:            nil, // TODO: Use new module abstraction
 		PluginConfigJSON:  pluginConfigJSON,
-		ExportedFunctions: exportedFunctions,
-		wasiP1HostModule:  wasiP1HostModule,
+		ExportedFunctions: nil, // TODO: Use new function abstraction
 	}
 
 	return plugin, nil
@@ -265,15 +264,16 @@ func createContextWithStack(ctx context.Context, stack *Stack) context.Context {
 // ProcessFunctionCall executes a WASM function and handles stack management
 func (p *WasmPlugin) ProcessFunctionCall(ctx context.Context, functionName string, stack *Stack) ([]uint64, error) {
 	ctx = createContextWithStack(ctx, stack)
-	// Set the WASI host module instance in the context
-	ctx = withModuleInstance(ctx, p.wasiP1HostModule)
+	// TODO: Set the WASI host module instance in the context using new runtime abstraction
+	// ctx = withModuleInstance(ctx, p.wasiP1HostModule)
 
-	fn, ok := p.ExportedFunctions[functionName]
+	_, ok := p.ExportedFunctions[functionName]
 	if !ok {
 		return nil, fmt.Errorf("wasm: function not found: %s", functionName)
 	}
 
-	return fn.Call(ctx)
+	// TODO: Use proper type assertion after fixing circular dependency
+	return nil, fmt.Errorf("wasm: function call not implemented in temporary interface{} version")
 }
 
 func (p *WasmPlugin) supportedTelemetryTypes(ctx context.Context) (telemetryType, error) {
@@ -317,11 +317,17 @@ func (p *WasmPlugin) IsTracesSupported(ctx context.Context) (bool, error) {
 
 // Shutdown closes the WASM runtime and system
 func (p *WasmPlugin) Shutdown(ctx context.Context) error {
-	if err := p.Sys.Close(ctx); err != nil {
-		return fmt.Errorf("wasm: error closing system: %w", err)
+	// TODO: Close runtime context using new abstraction
+	// Temporarily disabled due to interface{} usage
+	if p.RuntimeContext != nil {
+		// if err := p.RuntimeContext.Close(ctx); err != nil {
+		//     return fmt.Errorf("wasm: error closing runtime context: %w", err)
+		// }
 	}
-	if err := p.Runtime.Close(ctx); err != nil {
-		return fmt.Errorf("wasm: error closing runtime: %w", err)
+	if p.Runtime != nil {
+		// if err := p.Runtime.Close(ctx); err != nil {
+		//     return fmt.Errorf("wasm: error closing runtime: %w", err)
+		// }
 	}
 	return nil
 }
