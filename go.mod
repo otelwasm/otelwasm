@@ -25,7 +25,6 @@ require (
 	github.com/knadh/koanf/v2 v2.2.0 // indirect
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
-	github.com/otelwasm/wasibuilder v0.0.6 // indirect
 	github.com/rinchsan/gosimports v0.3.8 // indirect
 	github.com/spf13/cobra v1.9.1 // indirect
 	github.com/spf13/pflag v1.0.6 // indirect

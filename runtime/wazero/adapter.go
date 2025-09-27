@@ -127,6 +127,13 @@ func (r *wazeroRuntime) Close(ctx context.Context) error {
 	return r.runtime.Close(ctx)
 }
 
+// BuildOTelHostModule builds the OpenTelemetry host module for Wazero runtime
+// This method provides access to the wazero runtime for host module building
+func (r *wazeroRuntime) BuildOTelHostModule() (interface{}, error) {
+	// Return the raw wazero runtime so wasmplugin can use it for instantiateHostModule
+	return r.runtime, nil
+}
+
 // Close releases the resources associated with the compiled module
 func (m *wazeroCompiledModule) Close(ctx context.Context) error {
 	return m.module.Close(ctx)
