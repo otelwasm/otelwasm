@@ -4,16 +4,18 @@ go 1.24.2
 
 replace github.com/otelwasm/otelwasm/wasmplugin => ../wasmplugin
 
-require github.com/otelwasm/otelwasm/wasmplugin v0.0.0-00010101000000-000000000000
+require (
+	github.com/otelwasm/otelwasm/wasmplugin v0.0.0-00010101000000-000000000000
+	github.com/stealthrocket/wasi-go v0.8.0
+	github.com/tetratelabs/wazero v1.9.0
+)
 
 require (
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
-	github.com/stealthrocket/wasi-go v0.8.0 // indirect
 	github.com/stealthrocket/wazergo v0.19.1 // indirect
-	github.com/tetratelabs/wazero v1.9.0 // indirect
 	go.opentelemetry.io/collector/pdata v1.31.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/net v0.39.0 // indirect
