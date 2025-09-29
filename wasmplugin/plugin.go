@@ -9,12 +9,8 @@ import (
 	"os"
 	"sync/atomic"
 
-	// "github.com/otelwasm/otelwasm/runtime" // TODO: Fix circular dependency
-	"github.com/stealthrocket/wasi-go"
-	wasigo "github.com/stealthrocket/wasi-go/imports"
-	"github.com/stealthrocket/wasi-go/imports/wasi_snapshot_preview1"
-	"github.com/stealthrocket/wazergo"
-	"github.com/tetratelabs/wazero"
+	"github.com/otelwasm/otelwasm/runtime"
+	_ "github.com/otelwasm/otelwasm/runtime/wazero" // Register Wazero runtime
 	"github.com/tetratelabs/wazero/api"
 	"go.opentelemetry.io/collector/pdata/plog"
 	"go.opentelemetry.io/collector/pdata/pmetric"
@@ -77,20 +73,20 @@ func (s StatusCode) String() string {
 
 // WasmPlugin represents a WebAssembly plugin for OpenTelemetry components
 type WasmPlugin struct {
-	// Runtime is the WebAssembly runtime (abstracted - temporarily using interface{} to avoid circular dependency)
-	Runtime interface{} // TODO: Use runtime.Runtime after fixing circular dependency
+	// Runtime is the WebAssembly runtime (abstracted)
+	Runtime runtime.Runtime
 
 	// RuntimeContext holds runtime-specific state (WASI, host modules, etc.)
-	RuntimeContext interface{} // TODO: Use runtime.Context after fixing circular dependency
+	RuntimeContext runtime.Context
 
 	// Module is the instantiated WASM module (abstracted)
-	Module interface{} // TODO: Use runtime.ModuleInstance after fixing circular dependency
+	Module runtime.ModuleInstance
 
 	// PluginConfigJSON is the JSON representation of the plugin config
 	PluginConfigJSON []byte
 
 	// Exported functions from the WASM module (abstracted)
-	ExportedFunctions map[string]interface{} // TODO: Use runtime.FunctionInstance after fixing circular dependency
+	ExportedFunctions map[string]runtime.FunctionInstance
 }
 
 // stackKey is the key used to store the stack in the context
@@ -137,54 +133,40 @@ func NewWasmPlugin(ctx context.Context, cfg *Config, requiredFunctions []string)
 		return nil, err
 	}
 
-	runtime, guest, err := prepareRuntime(ctx, bytes, cfg.RuntimeConfig)
+	// Create runtime using the new abstraction
+	rt, err := runtime.NewRuntime(cfg.RuntimeConfig.Type, cfg.RuntimeConfig)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("wasm: error creating runtime: %w", err)
 	}
 
-	// Instantiate WASI module (wasi_snapshot_preview1 and wasmedge socket extension)
-	var sys wasi.System
-	ctx, sys, err = wasigo.NewBuilder().
-		WithSocketsExtension(wasmEdgeV2Extension, guest).
-		WithEnv(os.Environ()...).Instantiate(ctx, runtime)
+	// Compile the WASM module
+	compiledModule, err := rt.Compile(ctx, bytes)
 	if err != nil {
-		return nil, fmt.Errorf("wasm: error instantiating wasi module: %w", err)
+		return nil, fmt.Errorf("wasm: error compiling module: %w", err)
 	}
 
-	// Extract the wasi host module instance from the context as a workaround
-	// to avoid panic when calling wasi functions with different context than the one used to instantiate the host module.
-	wasiP1HostModule, ok := moduleInstanceFor[*wasi_snapshot_preview1.Module](ctx)
-	if !ok {
-		return nil, fmt.Errorf("wasm: error retrieving wasi host module instance")
-	}
+	// Create host module with OTel host functions
+	hostModule := createOTelHostModule()
 
-	if _, err := instantiateHostModule(ctx, runtime); err != nil {
-		return nil, fmt.Errorf("wasm: error instantiating host module: %w", err)
-	}
-
-	config := wazero.NewModuleConfig().
-		WithStartFunctions("_initialize"). // reactor module
-		WithStdout(os.Stdout).
-		WithStderr(os.Stderr)
-
-	mod, err := runtime.InstantiateModule(ctx, guest, config)
+	// Instantiate module with host functions
+	moduleInstance, runtimeContext, err := rt.InstantiateWithHost(ctx, compiledModule, *hostModule)
 	if err != nil {
-		return nil, fmt.Errorf("wasm: error instantiating guest: %w", err)
+		return nil, fmt.Errorf("wasm: error instantiating module: %w", err)
 	}
 
-	// Check if all required functions are exported
-	exportedFunctions := make(map[string]api.Function)
+	// Get exported functions
+	exportedFunctions := make(map[string]runtime.FunctionInstance)
 	for _, funcName := range requiredFunctions {
-		fn := mod.ExportedFunction(funcName)
+		fn := moduleInstance.Function(funcName)
 		if fn == nil {
 			return nil, fmt.Errorf("wasm: %s is not exported: %w", funcName, ErrRequiredFunctionNotExported)
 		}
 		exportedFunctions[funcName] = fn
 	}
 
-	// Check if all built-in guest functions are exported
+	// Check built-in guest functions
 	for _, funcName := range builtInGuestFunctions {
-		fn := mod.ExportedFunction(funcName)
+		fn := moduleInstance.Function(funcName)
 		if fn == nil {
 			return nil, fmt.Errorf("wasm: %s is not exported: %w", funcName, ErrRequiredFunctionNotExported)
 		}
@@ -197,63 +179,79 @@ func NewWasmPlugin(ctx context.Context, cfg *Config, requiredFunctions []string)
 		return nil, fmt.Errorf("wasm: error marshalling plugin config: %w", err)
 	}
 
-	// TODO: This constructor needs to be completely refactored for the new runtime abstraction
-	// For now, we temporarily maintain compatibility by creating a placeholder
-	_ = sys // TODO: Use in new runtime context
-	_ = wasiP1HostModule // TODO: Use in new runtime context
-
 	plugin := &WasmPlugin{
-		Runtime:           nil, // TODO: Use new runtime abstraction
-		RuntimeContext:    nil, // TODO: Use new runtime context
-		Module:            nil, // TODO: Use new module abstraction
+		Runtime:           rt,
+		RuntimeContext:    runtimeContext,
+		Module:            moduleInstance,
 		PluginConfigJSON:  pluginConfigJSON,
-		ExportedFunctions: nil, // TODO: Use new function abstraction
+		ExportedFunctions: exportedFunctions,
 	}
 
 	return plugin, nil
 }
 
-// prepareRuntime initializes a new WebAssembly runtime
-func prepareRuntime(ctx context.Context, guestBin []byte, rc *RuntimeConfig) (runtime wazero.Runtime, guest wazero.CompiledModule, err error) {
-	// TODO: Switch to compiler backend after fixing the memory allocator issue in wazero
-	var wrc wazero.RuntimeConfig
-
-	// Handle legacy configuration or missing config
-	if rc == nil || rc.Wazero == nil {
-		// Use default interpreter mode
-		wrc = wazero.NewRuntimeConfigInterpreter()
-	} else {
-		switch rc.Wazero.Mode {
-		case WazeroRuntimeModeInterpreter:
-			wrc = wazero.NewRuntimeConfigInterpreter()
-		case WazeroRuntimeModeCompiled:
-			// TODO: Add validation of supported platforms and architectures
-			wrc = wazero.NewRuntimeConfigCompiler()
-		default:
-			return nil, nil, fmt.Errorf("wasm: invalid wazero runtime mode: %s", rc.Wazero.Mode)
-		}
+// createOTelHostModule creates a host module with all OpenTelemetry functions
+func createOTelHostModule() *runtime.HostModule {
+	hostModule := &runtime.HostModule{
+		Name: otelWasm,
+		Functions: []runtime.HostFunctionDefinition{
+			{
+				FunctionName: currentTraces,
+				Function:     &runtime.WazeroHostFunction{Function: currentTracesFn},
+				ParamTypes:   []runtime.ValueType{runtime.ValueTypeI32, runtime.ValueTypeI32},
+				ResultTypes:  []runtime.ValueType{runtime.ValueTypeI32},
+			},
+			{
+				FunctionName: currentMetrics,
+				Function:     &runtime.WazeroHostFunction{Function: currentMetricsFn},
+				ParamTypes:   []runtime.ValueType{runtime.ValueTypeI32, runtime.ValueTypeI32},
+				ResultTypes:  []runtime.ValueType{runtime.ValueTypeI32},
+			},
+			{
+				FunctionName: currentLogs,
+				Function:     &runtime.WazeroHostFunction{Function: currentLogsFn},
+				ParamTypes:   []runtime.ValueType{runtime.ValueTypeI32, runtime.ValueTypeI32},
+				ResultTypes:  []runtime.ValueType{runtime.ValueTypeI32},
+			},
+			{
+				FunctionName: setResultTraces,
+				Function:     &runtime.WazeroHostFunction{Function: setResultTracesFn},
+				ParamTypes:   []runtime.ValueType{runtime.ValueTypeI32, runtime.ValueTypeI32},
+				ResultTypes:  []runtime.ValueType{},
+			},
+			{
+				FunctionName: setResultMetrics,
+				Function:     &runtime.WazeroHostFunction{Function: setResultMetricsFn},
+				ParamTypes:   []runtime.ValueType{runtime.ValueTypeI32, runtime.ValueTypeI32},
+				ResultTypes:  []runtime.ValueType{},
+			},
+			{
+				FunctionName: setResultLogs,
+				Function:     &runtime.WazeroHostFunction{Function: setResultLogsFn},
+				ParamTypes:   []runtime.ValueType{runtime.ValueTypeI32, runtime.ValueTypeI32},
+				ResultTypes:  []runtime.ValueType{},
+			},
+			{
+				FunctionName: getPluginConfig,
+				Function:     &runtime.WazeroHostFunction{Function: getPluginConfigFn},
+				ParamTypes:   []runtime.ValueType{runtime.ValueTypeI32, runtime.ValueTypeI32},
+				ResultTypes:  []runtime.ValueType{runtime.ValueTypeI32},
+			},
+			{
+				FunctionName: setResultStatusReason,
+				Function:     &runtime.WazeroHostFunction{Function: setResultStatusReasonFn},
+				ParamTypes:   []runtime.ValueType{runtime.ValueTypeI32, runtime.ValueTypeI32},
+				ResultTypes:  []runtime.ValueType{},
+			},
+			{
+				FunctionName: getShutdownRequested,
+				Function:     &runtime.WazeroHostFunction{Function: getShutdownRequestedFn},
+				ParamTypes:   []runtime.ValueType{},
+				ResultTypes:  []runtime.ValueType{runtime.ValueTypeI32},
+			},
+		},
 	}
-	runtime = wazero.NewRuntimeWithConfig(ctx, wrc)
-
-	guest, err = compileGuest(ctx, runtime, guestBin)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return runtime, guest, nil
-}
-
-// compileGuest compiles the guest module
-func compileGuest(ctx context.Context, runtime wazero.Runtime, guestBin []byte) (guest wazero.CompiledModule, err error) {
-	if guest, err = runtime.CompileModule(ctx, guestBin); err != nil {
-		err = fmt.Errorf("wasm: error compiling guest: %w", err)
-	} else if _, ok := guest.ExportedMemories()[guestExportMemory]; !ok {
-		// This section checks if the guest exports memory section.
-		// As of WebAssembly Core Specification 2.0, there can be at most one memory.
-		// https://webassembly.github.io/spec/core/syntax/modules.html#memories
-		err = fmt.Errorf("wasm: guest doesn't export memory[%s]", guestExportMemory)
-	}
-	return
+	return hostModule
 }
 
 // createContextWithStack creates a new context with a Stack
@@ -264,16 +262,15 @@ func createContextWithStack(ctx context.Context, stack *Stack) context.Context {
 // ProcessFunctionCall executes a WASM function and handles stack management
 func (p *WasmPlugin) ProcessFunctionCall(ctx context.Context, functionName string, stack *Stack) ([]uint64, error) {
 	ctx = createContextWithStack(ctx, stack)
-	// TODO: Set the WASI host module instance in the context using new runtime abstraction
-	// ctx = withModuleInstance(ctx, p.wasiP1HostModule)
+	// Set runtime context with WASI module instance for function calls
+	ctx = p.RuntimeContext.WithRuntimeContext(ctx)
 
-	_, ok := p.ExportedFunctions[functionName]
+	fn, ok := p.ExportedFunctions[functionName]
 	if !ok {
 		return nil, fmt.Errorf("wasm: function not found: %s", functionName)
 	}
 
-	// TODO: Use proper type assertion after fixing circular dependency
-	return nil, fmt.Errorf("wasm: function call not implemented in temporary interface{} version")
+	return fn.Call(ctx)
 }
 
 func (p *WasmPlugin) supportedTelemetryTypes(ctx context.Context) (telemetryType, error) {
@@ -317,18 +314,20 @@ func (p *WasmPlugin) IsTracesSupported(ctx context.Context) (bool, error) {
 
 // Shutdown closes the WASM runtime and system
 func (p *WasmPlugin) Shutdown(ctx context.Context) error {
-	// TODO: Close runtime context using new abstraction
-	// Temporarily disabled due to interface{} usage
+	// Close runtime context first
 	if p.RuntimeContext != nil {
-		// if err := p.RuntimeContext.Close(ctx); err != nil {
-		//     return fmt.Errorf("wasm: error closing runtime context: %w", err)
-		// }
+		if err := p.RuntimeContext.Close(ctx); err != nil {
+			return fmt.Errorf("wasm: error closing runtime context: %w", err)
+		}
 	}
+
+	// Close the runtime
 	if p.Runtime != nil {
-		// if err := p.Runtime.Close(ctx); err != nil {
-		//     return fmt.Errorf("wasm: error closing runtime: %w", err)
-		// }
+		if err := p.Runtime.Close(ctx); err != nil {
+			return fmt.Errorf("wasm: error closing runtime: %w", err)
+		}
 	}
+
 	return nil
 }
 
@@ -470,57 +469,5 @@ func setResultStatusReasonFn(ctx context.Context, mod api.Module, stack []uint64
 	paramsFromContext(ctx).StatusReason = string(reasonBytes)
 }
 
-// instantiateHostModule creates and instantiates the host module with exported functions
-func instantiateHostModule(ctx context.Context, runtime wazero.Runtime) (api.Module, error) {
-	return runtime.NewHostModuleBuilder(otelWasm).
-		NewFunctionBuilder().
-		WithGoModuleFunction(api.GoModuleFunc(currentTracesFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{api.ValueTypeI32}).
-		WithParameterNames("buf", "buf_limit").Export(currentTraces).
-		NewFunctionBuilder().
-		WithGoModuleFunction(api.GoModuleFunc(currentMetricsFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{api.ValueTypeI32}).
-		WithParameterNames("buf", "buf_limit").Export(currentMetrics).
-		NewFunctionBuilder().
-		WithGoModuleFunction(api.GoModuleFunc(currentLogsFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{api.ValueTypeI32}).
-		WithParameterNames("buf", "buf_limit").Export(currentLogs).
-		NewFunctionBuilder().
-		WithGoModuleFunction(api.GoModuleFunc(setResultTracesFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{}).
-		WithParameterNames("buf", "buf_len").Export(setResultTraces).
-		NewFunctionBuilder().
-		WithGoModuleFunction(api.GoModuleFunc(setResultMetricsFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{}).
-		WithParameterNames("buf", "buf_len").Export(setResultMetrics).
-		NewFunctionBuilder().
-		WithGoModuleFunction(api.GoModuleFunc(setResultLogsFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{}).
-		WithParameterNames("buf", "buf_len").Export(setResultLogs).
-		NewFunctionBuilder().
-		WithGoModuleFunction(api.GoModuleFunc(getPluginConfigFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{api.ValueTypeI32}).
-		WithParameterNames("buf", "buf_limit").Export(getPluginConfig).
-		NewFunctionBuilder().
-		WithGoModuleFunction(api.GoModuleFunc(setResultStatusReasonFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{}).
-		WithParameterNames("buf", "buf_len").Export(setResultStatusReason).
-		NewFunctionBuilder().
-		WithGoModuleFunction(api.GoModuleFunc(getShutdownRequestedFn), []api.ValueType{}, []api.ValueType{api.ValueTypeI32}).
-		Export(getShutdownRequested).
-		Instantiate(ctx)
-}
-
-// moduleInstanceFor returns the module instance from the context that contains the internal
-// state required for WASI host functions.
-// NOTE: wasi-go returns context containing internal state when initializing the host module,
-// and the same context is required when calling wasi functions exposed by wasi-go.
-// This is a kind of workaround to avoid panic when calling
-// wasi functions with different context than the one used to instantiate the host module.
-func moduleInstanceFor[T wazergo.Module](ctx context.Context) (res T, ok bool) {
-	res, ok = ctx.Value((*wazergo.ModuleInstance[T])(nil)).(T)
-	return
-}
-
-// withModuleInstance returns a Go context inheriting from ctx and containing the
-// state needed for module instantiated from wazero host module to properly bind
-// their methods to their receiver (e.g. the module instance).
-// NOTE: wasi-go returns context containing internal state when initializing the
-// host module, and the same context is required when calling wasi functions
-// exposed by wasi-go. This is a kind of workaround to avoid panic when calling
-// wasi functions with different context than the one used to instantiate the host module.
-func withModuleInstance[T wazergo.Module](ctx context.Context, instance T) context.Context {
-	return context.WithValue(ctx, (*wazergo.ModuleInstance[T])(nil), instance)
-}
+// Legacy functions removed - these were Wazero-specific WASI context management
+// TODO: These will be handled by the runtime abstraction layer in the future

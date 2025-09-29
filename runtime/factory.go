@@ -1,10 +1,7 @@
 package runtime
 
 import (
-	"context"
 	"fmt"
-
-	"github.com/otelwasm/otelwasm/wasmplugin"
 )
 
 // Factory is a function that creates a new Runtime
@@ -20,12 +17,11 @@ func Register(name string, factory Factory) {
 	runtimeFactories[name] = factory
 }
 
-// New creates a new Runtime based on the config
-func New(ctx context.Context, config *wasmplugin.RuntimeConfig) (Runtime, error) {
+// NewRuntime creates a new Runtime by name and config
+func NewRuntime(runtimeType string, config interface{}) (Runtime, error) {
 	// Default to wazero if not specified
-	runtimeType := config.Type
 	if runtimeType == "" {
-		runtimeType = wasmplugin.RuntimeTypeWazero
+		runtimeType = "wazero"
 	}
 
 	factory, ok := runtimeFactories[runtimeType]
@@ -33,18 +29,7 @@ func New(ctx context.Context, config *wasmplugin.RuntimeConfig) (Runtime, error)
 		return nil, fmt.Errorf("unknown runtime type: %s: %w", runtimeType, ErrRuntimeNotFound)
 	}
 
-	// Extract runtime-specific configuration
-	var specificConfig interface{}
-	switch runtimeType {
-	case wasmplugin.RuntimeTypeWazero:
-		specificConfig = config.Wazero
-	case wasmplugin.RuntimeTypeWasmtime:
-		specificConfig = config.Wasmtime
-	default:
-		specificConfig = config.Remaining[runtimeType]
-	}
-
-	return factory(specificConfig)
+	return factory(config)
 }
 
 // List returns all registered runtime types

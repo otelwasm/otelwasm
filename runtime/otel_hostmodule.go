@@ -8,15 +8,4 @@ package runtime
 // for a specific runtime implementation
 type HostModuleBuilderFunc func(runtime Runtime) (interface{}, error)
 
-// OTelHostModuleBuilder builds the OpenTelemetry host module for the given runtime
-func OTelHostModuleBuilder(rt Runtime) (interface{}, error) {
-	switch v := rt.(type) {
-	case *wazeroRuntime:
-		// For Wazero runtime, delegate to wasmplugin's instantiateHostModule
-		// This maintains existing functionality while allowing abstraction
-		return v.BuildOTelHostModule()
-	default:
-		// Future runtime implementations will add their own host module builders here
-		return nil, ErrRuntimeNotSupported
-	}
-}
+// TODO: OTelHostModuleBuilder will be implemented when circular dependency is resolved

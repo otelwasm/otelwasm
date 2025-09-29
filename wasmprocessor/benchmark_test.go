@@ -67,7 +67,12 @@ func BenchmarkNopProcessorWasmCompiled(b *testing.B) {
 	// Test that the processor can be created with the default config
 	factory := NewFactory()
 	cfg := factory.CreateDefaultConfig().(*Config)
-	cfg.RuntimeConfig.Mode = wasmplugin.RuntimeModeCompiled
+	cfg.RuntimeConfig = &wasmplugin.RuntimeConfig{
+		// 		Type: wasmplugin.RuntimeTypeWazero,
+		// 		Wazero: &wasmplugin.WazeroConfig{
+		// 			Mode: wasmplugin.WazeroRuntimeModeCompiled,
+		// 		},
+	}
 	cfg.Path = "testdata/nop/main.wasm"
 	ctx := b.Context()
 
@@ -191,10 +196,15 @@ func BenchmarkAttributesProcessorWasmInterpreter(b *testing.B) {
 // 				"key":    "key",
 // 				"value":  "value",
 // 				"action": "insert",
-// 			},
+// 	// 		},
+// // 		},
+// 	}
+// 	cfg.RuntimeConfig = &wasmplugin.RuntimeConfig{
+// 		Type: wasmplugin.RuntimeTypeWazero,
+// 		Wazero: &wasmplugin.WazeroConfig{
+// 			Mode: wasmplugin.WazeroRuntimeModeCompiled,
 // 		},
 // 	}
-// 	cfg.RuntimeConfig.Mode = wasmplugin.RuntimeModeCompiled
 // 	ctx := b.Context()
 
 // 	// Test for traces

@@ -11,25 +11,36 @@ func TestRuntimeConfigValidate(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "valid interpreter mode",
+			name: "valid wazero runtime with interpreter mode",
 			config: RuntimeConfig{
-				Mode: RuntimeModeInterpreter,
+				Type: RuntimeTypeWazero,
+				Wazero: &WazeroConfig{
+					Mode: WazeroRuntimeModeInterpreter,
+				},
 			},
 			wantErr: false,
 		},
 		{
-			name: "valid compiled mode",
+			name: "valid wazero runtime with compiled mode",
 			config: RuntimeConfig{
-				Mode: RuntimeModeCompiled,
+				Type: RuntimeTypeWazero,
+				Wazero: &WazeroConfig{
+					Mode: WazeroRuntimeModeCompiled,
+				},
 			},
 			wantErr: false,
 		},
 		{
-			name: "invalid mode",
+			name: "invalid runtime type",
 			config: RuntimeConfig{
-				Mode: "invalid",
+				Type: "invalid",
 			},
 			wantErr: true,
+		},
+		{
+			name:    "empty runtime type (should default to wazero)",
+			config:  RuntimeConfig{},
+			wantErr: false,
 		},
 	}
 
@@ -45,27 +56,36 @@ func TestRuntimeConfigValidate(t *testing.T) {
 
 func TestRuntimeConfigDefault(t *testing.T) {
 	tests := []struct {
-		name           string
-		config         RuntimeConfig
-		expectedConfig RuntimeConfig
+		name         string
+		config       RuntimeConfig
+		expectedType string
+		expectedMode WazeroRuntimeMode
 	}{
 		{
-			name:           "empty mode",
-			config:         RuntimeConfig{},
-			expectedConfig: RuntimeConfig{Mode: RuntimeModeInterpreter},
+			name:         "empty config",
+			config:       RuntimeConfig{},
+			expectedType: RuntimeTypeWazero,
+			expectedMode: WazeroRuntimeModeInterpreter,
 		},
 		{
-			name:           "compiled mode",
-			config:         RuntimeConfig{Mode: RuntimeModeCompiled},
-			expectedConfig: RuntimeConfig{Mode: RuntimeModeCompiled},
+			name: "explicit wazero compiled mode",
+			config: RuntimeConfig{
+				Type:   RuntimeTypeWazero,
+				Wazero: &WazeroConfig{Mode: WazeroRuntimeModeCompiled},
+			},
+			expectedType: RuntimeTypeWazero,
+			expectedMode: WazeroRuntimeModeCompiled,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.config.Default()
-			if tt.config.Mode != tt.expectedConfig.Mode {
-				t.Errorf("RuntimeConfig.Default() set Mode = %v, want %v", tt.config.Mode, tt.expectedConfig.Mode)
+			if tt.config.Type != tt.expectedType {
+				t.Errorf("RuntimeConfig.Default() set Type = %v, want %v", tt.config.Type, tt.expectedType)
+			}
+			if tt.config.Wazero != nil && tt.config.Wazero.Mode != tt.expectedMode {
+				t.Errorf("RuntimeConfig.Default() set Wazero.Mode = %v, want %v", tt.config.Wazero.Mode, tt.expectedMode)
 			}
 		})
 	}
@@ -81,8 +101,11 @@ func TestConfigValidate(t *testing.T) {
 			name: "valid config",
 			config: Config{
 				Path: "test.wasm",
-				RuntimeConfig: RuntimeConfig{
-					Mode: RuntimeModeInterpreter,
+				RuntimeConfig: &RuntimeConfig{
+					Type: RuntimeTypeWazero,
+					Wazero: &WazeroConfig{
+						Mode: WazeroRuntimeModeInterpreter,
+					},
 				},
 			},
 			wantErr: false,
@@ -90,18 +113,21 @@ func TestConfigValidate(t *testing.T) {
 		{
 			name: "missing path",
 			config: Config{
-				RuntimeConfig: RuntimeConfig{
-					Mode: RuntimeModeInterpreter,
+				RuntimeConfig: &RuntimeConfig{
+					Type: RuntimeTypeWazero,
+					Wazero: &WazeroConfig{
+						Mode: WazeroRuntimeModeInterpreter,
+					},
 				},
 			},
 			wantErr: true,
 		},
 		{
-			name: "invalid runtime mode",
+			name: "invalid runtime type",
 			config: Config{
 				Path: "test.wasm",
-				RuntimeConfig: RuntimeConfig{
-					Mode: "invalid",
+				RuntimeConfig: &RuntimeConfig{
+					Type: "invalid",
 				},
 			},
 			wantErr: true,
@@ -113,8 +139,11 @@ func TestConfigValidate(t *testing.T) {
 				PluginConfig: PluginConfig{
 					"key": "value",
 				},
-				RuntimeConfig: RuntimeConfig{
-					Mode: RuntimeModeCompiled,
+				RuntimeConfig: &RuntimeConfig{
+					Type: RuntimeTypeWazero,
+					Wazero: &WazeroConfig{
+						Mode: WazeroRuntimeModeCompiled,
+					},
 				},
 			},
 			wantErr: false,
@@ -133,45 +162,45 @@ func TestConfigValidate(t *testing.T) {
 
 func TestConfigDefault(t *testing.T) {
 	tests := []struct {
-		name           string
-		config         Config
-		expectedConfig Config
+		name         string
+		config       Config
+		expectedType string
+		expectedMode WazeroRuntimeMode
 	}{
 		{
 			name: "empty config",
 			config: Config{
 				Path: "test.wasm",
 			},
-			expectedConfig: Config{
-				Path: "test.wasm",
-				RuntimeConfig: RuntimeConfig{
-					Mode: RuntimeModeInterpreter,
-				},
-			},
+			expectedType: RuntimeTypeWazero,
+			expectedMode: WazeroRuntimeModeInterpreter,
 		},
 		{
 			name: "config with custom mode",
 			config: Config{
 				Path: "test.wasm",
-				RuntimeConfig: RuntimeConfig{
-					Mode: RuntimeModeCompiled,
+				RuntimeConfig: &RuntimeConfig{
+					Type: RuntimeTypeWazero,
+					Wazero: &WazeroConfig{
+						Mode: WazeroRuntimeModeCompiled,
+					},
 				},
 			},
-			expectedConfig: Config{
-				Path: "test.wasm",
-				RuntimeConfig: RuntimeConfig{
-					Mode: RuntimeModeCompiled,
-				},
-			},
+			expectedType: RuntimeTypeWazero,
+			expectedMode: WazeroRuntimeModeCompiled,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.config.Default()
-			if tt.config.RuntimeConfig.Mode != tt.expectedConfig.RuntimeConfig.Mode {
-				t.Errorf("Config.Default() set RuntimeConfig.Mode = %v, want %v",
-					tt.config.RuntimeConfig.Mode, tt.expectedConfig.RuntimeConfig.Mode)
+			if tt.config.RuntimeConfig.Type != tt.expectedType {
+				t.Errorf("Config.Default() set RuntimeConfig.Type = %v, want %v",
+					tt.config.RuntimeConfig.Type, tt.expectedType)
+			}
+			if tt.config.RuntimeConfig.Wazero != nil && tt.config.RuntimeConfig.Wazero.Mode != tt.expectedMode {
+				t.Errorf("Config.Default() set RuntimeConfig.Wazero.Mode = %v, want %v",
+					tt.config.RuntimeConfig.Wazero.Mode, tt.expectedMode)
 			}
 		})
 	}

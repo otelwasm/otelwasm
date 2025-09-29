@@ -3,8 +3,7 @@ module github.com/otelwasm/otelwasm/wasmplugin
 go 1.24.2
 
 require (
-	github.com/stealthrocket/wasi-go v0.8.0
-	github.com/stealthrocket/wazergo v0.19.1
+	github.com/otelwasm/otelwasm/runtime v0.0.0-00010101000000-000000000000
 	github.com/tetratelabs/wazero v1.9.0
 	go.opentelemetry.io/collector/pdata v1.31.0
 )
@@ -14,6 +13,8 @@ require (
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
+	github.com/stealthrocket/wasi-go v0.8.0 // indirect
+	github.com/stealthrocket/wazergo v0.19.1 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/net v0.39.0 // indirect
 	golang.org/x/sys v0.32.0 // indirect
@@ -22,3 +23,5 @@ require (
 	google.golang.org/grpc v1.72.0 // indirect
 	google.golang.org/protobuf v1.36.6 // indirect
 )
+
+replace github.com/otelwasm/otelwasm/runtime => ../runtime

@@ -50,10 +50,8 @@ type Memory interface {
 type Context interface {
 	// Close releases runtime-specific resources
 	Close(ctx context.Context) error
+	// WithRuntimeContext returns a context configured for runtime-specific operations
+	WithRuntimeContext(ctx context.Context) context.Context
 }
 
-// HostModule defines host functions to be made available to WASM modules
-type HostModule interface {
-	// Functions returns the list of host functions to register
-	Functions() []HostFunction
-}
+// HostModule is defined in types.go as a concrete type

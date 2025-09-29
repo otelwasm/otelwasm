@@ -5,14 +5,13 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/otelwasm/otelwasm/runtime"
 	"github.com/stealthrocket/wasi-go"
 	wasigo "github.com/stealthrocket/wasi-go/imports"
 	"github.com/stealthrocket/wasi-go/imports/wasi_snapshot_preview1"
+	"github.com/stealthrocket/wazergo"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
-
-	"github.com/otelwasm/otelwasm/runtime"
-	"github.com/otelwasm/otelwasm/wasmplugin"
 )
 
 const (
@@ -25,7 +24,7 @@ const (
 // wazeroRuntime implements runtime.Runtime using Wazero
 type wazeroRuntime struct {
 	runtime wazero.Runtime
-	config  *wasmplugin.WazeroConfig
+	config  interface{} // TODO: Use proper config type after resolving circular dependency
 }
 
 // wazeroCompiledModule implements runtime.CompiledModule for Wazero
@@ -89,11 +88,12 @@ func (r *wazeroRuntime) InstantiateWithHost(ctx context.Context, module runtime.
 		return nil, nil, fmt.Errorf("wasi instantiation failed: %w", err)
 	}
 
-	// Extract the wasi host module instance from the context
+	// Extract the wasi host module instance from the context as a workaround
+	// to avoid panic when calling wasi functions with different context than the one used to instantiate the host module.
 	wasiP1HostModule, ok := moduleInstanceFor[*wasi_snapshot_preview1.Module](ctx)
 	if !ok {
 		sys.Close(ctx)
-		return nil, nil, fmt.Errorf("failed to retrieve wasi host module instance: %w", runtime.ErrModuleInstantiateFailed)
+		return nil, nil, fmt.Errorf("failed to retrieve wasi host module instance: %w", runtime.ErrInvalidConfiguration)
 	}
 
 	// Instantiate host module
@@ -182,20 +182,27 @@ func (c *wazeroContext) Close(ctx context.Context) error {
 	return c.sys.Close(ctx)
 }
 
+// WithRuntimeContext returns a context configured for runtime-specific operations
+func (c *wazeroContext) WithRuntimeContext(ctx context.Context) context.Context {
+	return withModuleInstance(ctx, c.wasiP1HostModule)
+}
+
 // instantiateHostModule creates and instantiates the host module with exported functions
 func (r *wazeroRuntime) instantiateHostModule(ctx context.Context, hostModule runtime.HostModule) (api.Module, error) {
 	builder := r.runtime.NewHostModuleBuilder("opentelemetry.io/wasm")
 
 	// Register all host functions
-	for _, hostFunc := range hostModule.Functions() {
+	for _, hostFunc := range hostModule.GetFunctions() {
 		// Get wazero-specific implementation
-		wazeroFunc := hostFunc.Function
-		if implGetter, ok := hostFunc.Function.(interface{ GetImplementation(string) interface{} }); ok {
-			wazeroFunc = implGetter.GetImplementation(wasmplugin.RuntimeTypeWazero)
+		wazeroImpl := hostFunc.Function.GetImplementation("wazero")
+		if wazeroImpl == nil {
+			return nil, fmt.Errorf("no wazero implementation for host function %s: %w", hostFunc.FunctionName, runtime.ErrHostFunctionNotFound)
 		}
 
-		if wazeroFunc == nil {
-			return nil, fmt.Errorf("no wazero implementation for host function %s: %w", hostFunc.FunctionName, runtime.ErrHostFunctionNotFound)
+		// Cast to the expected function signature
+		wazeroFunc, ok := wazeroImpl.(func(context.Context, api.Module, []uint64))
+		if !ok {
+			return nil, fmt.Errorf("invalid wazero function signature for %s: %w", hostFunc.FunctionName, runtime.ErrHostFunctionNotFound)
 		}
 
 		// Convert runtime.ValueType to api.ValueType
@@ -210,7 +217,7 @@ func (r *wazeroRuntime) instantiateHostModule(ctx context.Context, hostModule ru
 		}
 
 		builder = builder.NewFunctionBuilder().
-			WithGoModuleFunction(api.GoModuleFunc(wazeroFunc.(func(context.Context, api.Module, []uint64))), paramTypes, resultTypes).
+			WithGoModuleFunction(api.GoModuleFunc(wazeroFunc), paramTypes, resultTypes).
 			Export(hostFunc.FunctionName)
 	}
 
@@ -233,16 +240,27 @@ func convertValueType(vt runtime.ValueType) api.ValueType {
 	}
 }
 
-// moduleInstanceFor returns the module instance from the context
-func moduleInstanceFor[T any](ctx context.Context) (T, bool) {
-	var zero T
-	val := ctx.Value((*moduleInstanceWrapper[T])(nil))
-	if val == nil {
-		return zero, false
-	}
-	result, ok := val.(T)
-	return result, ok
-}
-
 // moduleInstanceWrapper is a type wrapper for context values
 type moduleInstanceWrapper[T any] struct{}
+
+// moduleInstanceFor returns the module instance from the context that contains the internal
+// state required for WASI host functions.
+// NOTE: wasi-go returns context containing internal state when initializing the host module,
+// and the same context is required when calling wasi functions exposed by wasi-go.
+// This is a kind of workaround to avoid panic when calling
+// wasi functions with different context than the one used to instantiate the host module.
+func moduleInstanceFor[T wazergo.Module](ctx context.Context) (res T, ok bool) {
+	res, ok = ctx.Value((*wazergo.ModuleInstance[T])(nil)).(T)
+	return
+}
+
+// withModuleInstance returns a Go context inheriting from ctx and containing the
+// state needed for module instantiated from wazero host module to properly bind
+// their methods to their receiver (e.g. the module instance).
+// NOTE: wasi-go returns context containing internal state when initializing the
+// host module, and the same context is required when calling wasi functions
+// exposed by wasi-go. This is a kind of workaround to avoid panic when calling
+// wasi functions with different context than the one used to instantiate the host module.
+func withModuleInstance[T wazergo.Module](ctx context.Context, instance T) context.Context {
+	return context.WithValue(ctx, (*wazergo.ModuleInstance[T])(nil), instance)
+}

@@ -30,6 +30,7 @@ require (
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
+	github.com/otelwasm/otelwasm/runtime v0.0.0-00010101000000-000000000000 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/stealthrocket/wasi-go v0.8.0 // indirect
 	github.com/stealthrocket/wazergo v0.19.1 // indirect
@@ -70,3 +71,5 @@ require (
 )
 
 replace github.com/otelwasm/otelwasm/wasmplugin => ../wasmplugin
+
+replace github.com/otelwasm/otelwasm/runtime => ../runtime

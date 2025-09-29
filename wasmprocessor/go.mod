@@ -45,6 +45,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/filter v0.126.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/ottl v0.126.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/pdatautil v0.126.0 // indirect
+	github.com/otelwasm/otelwasm/runtime v0.0.0-00010101000000-000000000000 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/stealthrocket/wasi-go v0.8.0 // indirect
 	github.com/stealthrocket/wazergo v0.19.1 // indirect
@@ -82,3 +83,5 @@ require (
 )
 
 replace github.com/otelwasm/otelwasm/wasmplugin => ../wasmplugin
+
+replace github.com/otelwasm/otelwasm/runtime => ../runtime
