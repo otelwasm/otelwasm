@@ -371,11 +371,169 @@ Suggested implementation sequence:
 - **`alloc` failure handling**: Should the host retry with a smaller batch, or
   immediately propagate the error? The current spec says propagate, but retry may be
   desirable for large batches.
-- **`dealloc` export**: Should the guest also export `dealloc(ptr, size)` for
-  symmetry? Rust's allocator requires knowing the layout for deallocation. For v1,
-  deallocation is handled internally by the guest after `consume_*` returns, so
-  `dealloc` is not needed by the host. This may change if future features require the
-  host to manage guest memory lifetime.
+- **`dealloc` export**: ✓ **Resolved** — After surveying other WASM ABIs (proxy-wasm,
+  http-wasm, Component Model), we confirmed that omitting `dealloc` is standard practice.
+  Deallocation is handled internally by the guest after `consume_*` returns. See §9 for
+  detailed analysis.
 - **Receiver model**: Receivers use `start_*_receiver()` which blocks and does not
   receive pushed data. This is orthogonal to the push/pull decision for processors and
   exporters. Future versions may introduce a tick-based receiver model.
+
+---
+
+## 9. Memory Deallocation: Industry Survey
+
+As part of the v1 ABI design process, we surveyed how other WebAssembly ABI specifications
+handle memory deallocation to validate our decision to omit an explicit `dealloc` host
+function.
+
+### 9.1 Proxy-Wasm ABI (v0.2.1 and vNEXT)
+
+**Allocation:**
+- Guest exports: `proxy_on_memory_allocate(size: i32) -> i32` (preferred)
+- Guest exports: `malloc(size: i32) -> i32` (deprecated, for backward compatibility)
+- Host calls these functions to allocate memory in the guest's linear memory
+
+**Deallocation:**
+- **No explicit deallocation function**
+- Memory management is entirely guest-controlled
+- Host requests allocations; guest manages cleanup
+
+**Rationale (from spec):**
+> "Called to allocate continuous memory buffer of `memory_size` using the in-VM memory
+> allocator."
+
+The design emphasizes plugin-controlled memory management rather than host-directed
+deallocation, allowing flexible internal heap strategies.
+
+**Source**: [proxy-wasm/spec](https://github.com/proxy-wasm/spec/blob/main/abi-versions/vNEXT/README.md)
+
+### 9.2 HTTP-WASM Handler ABI
+
+**Allocation:**
+- **No `malloc` or `alloc` function at all**
+- Uses a buffer-passing pattern instead
+
+**Pattern:**
+- Functions accept `buf` (offset in linear memory) and `buf_limit` (max size) parameters
+- Guest provides pre-allocated buffer space
+- Host writes data into the specified location
+- Guest can grow memory via `memory.grow` if needed
+
+**Deallocation:**
+- Not applicable (no dynamic allocation)
+
+**Rationale (from spec):**
+> "This specification relies completely on guest wasm to define how to manage memory, and
+> does not require WASI or any other guest imports."
+
+Memory management is entirely delegated to the guest runtime, whether that's a language's GC,
+manual allocation, or stack-based management.
+
+**Source**: [http-wasm.io/http-handler-abi](https://http-wasm.io/http-handler-abi/)
+
+### 9.3 WebAssembly Component Model (Canonical ABI)
+
+**Allocation:**
+- Uses `cabi_realloc(old_ptr, old_size, align, new_size) -> new_ptr`
+- Canonical ABI function for allocation and reallocation
+
+**Deallocation:**
+- Call `cabi_realloc(ptr, old_size, 1, 0)` to free memory
+- Deallocation is a special case of reallocation
+
+**Current issues:**
+- Cannot pass pre-allocated buffers; host must call guest's allocator
+- Inefficient for embedded systems where dynamic allocation is discouraged
+- Multiple copies and allocations for simple data transfers
+
+**Proposed optimization** (Issue #314):
+- "Caller-supplied buffer hack" using special globals
+- Allows guest to detect and reuse pre-allocated buffers
+- Implementation in toolchain (wit-bindgen, wasi-libc) rather than spec change
+
+**Source**: [WebAssembly/component-model#314](https://github.com/WebAssembly/component-model/issues/314)
+
+### 9.4 Summary: Why otelwasm Omits `dealloc`
+
+Based on this survey, we concluded that omitting an explicit `dealloc` host function is:
+
+1. **Standard practice**: Both proxy-wasm and http-wasm follow this pattern
+2. **Language-neutral**: Accommodates GC languages (Go), RAII languages (Rust), and manual
+   management (Zig)
+3. **Ownership-clear**: Guest allocates → guest owns → guest deallocates
+4. **Simpler ABI**: Fewer host functions, fewer edge cases
+
+### 9.5 Alternative Approaches Considered and Rejected
+
+#### Option 1: Export `dealloc(ptr, size)`
+
+**Pros:**
+- Symmetric API (`alloc` + `dealloc`)
+- Host could explicitly free memory after processing
+
+**Cons:**
+- Incompatible with Go's GC (pinned allocations must be unpinned, not explicitly freed)
+- Incompatible with Rust's Drop trait (double-free risk)
+- Adds complexity without clear benefit
+- Not needed given single-threaded execution model
+
+**Verdict**: Rejected
+
+#### Option 2: Component Model's `cabi_realloc` pattern
+
+**Pros:**
+- Standardized approach
+- Supports both allocation and deallocation
+
+**Cons:**
+- Requires Canonical ABI support in guest SDK
+- More complex API surface
+- Still has efficiency issues (Component Model Issue #314)
+- Overkill for otelwasm's simple data passing needs
+
+**Verdict**: Rejected for v1; may revisit in future versions if Component Model adoption
+increases
+
+#### Option 3: Buffer-passing (http-wasm pattern)
+
+**Pros:**
+- No dynamic allocation needed
+- Very simple ABI
+
+**Cons:**
+- Doesn't align with OTel Collector's push-based consumer model
+- Requires two-pass protocol (get size, allocate, retry) for variable-size data
+- Less ergonomic for plugin authors
+
+**Verdict**: Rejected; the push model better mirrors Collector interfaces
+
+### 9.6 Implications for Guest SDK Implementations
+
+Each language's guest SDK handles memory differently:
+
+**Go:**
+- Uses pinning map to prevent GC collection
+- `TakeOwnership(ptr, size)` unpins and returns the buffer
+- Memory freed by Go's GC after buffer is no longer referenced
+
+**Rust:**
+- `alloc` uses `std::alloc::alloc` with appropriate `Layout`
+- Guest SDK provides safe wrapper that deallocates in Drop implementation
+- No GC concerns; deallocation is deterministic
+
+**Zig:**
+- `alloc` uses `std.heap.wasm_allocator`
+- Guest SDK manages allocation/deallocation via Zig's allocator interface
+- Manual memory management, explicit deallocation
+
+All three approaches work correctly with the guest-managed deallocation pattern.
+
+### 9.7 References
+
+- [proxy-wasm ABI Specification](https://github.com/proxy-wasm/spec)
+- [http-wasm HTTP Handler ABI](https://http-wasm.io/http-handler-abi/)
+- [WebAssembly Component Model](https://github.com/WebAssembly/component-model)
+- [Component Model Issue #314: Efficient memory passing](https://github.com/WebAssembly/component-model/issues/314)
+- [A Practical Guide to WebAssembly Memory](https://radu-matei.com/blog/practical-guide-to-wasm-memory/)
+- [Wasm needs a better memory management story](https://github.com/WebAssembly/design/issues/1397)
