@@ -29,7 +29,7 @@ func StatusToCode(s *api.Status) uint32 {
 
 func setStatusReason(reason string) {
 	ptr, size := mem.StringToPtr(reason)
-	setResultStatusReason(ptr, size)
+	setStatusReasonHost(ptr, size)
 	runtime.KeepAlive(reason) // until ptr is no longer needed.
 }
 

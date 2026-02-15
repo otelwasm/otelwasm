@@ -45,6 +45,7 @@ func createTraces(
 	return processorhelper.NewTraces(ctx, set, cfg, nextConsumer,
 		wasmProcessor.processTraces,
 		processorhelper.WithCapabilities(processorCapabilities),
+		processorhelper.WithStart(wasmProcessor.start),
 		processorhelper.WithShutdown(wasmProcessor.shutdown),
 	)
 }

@@ -2,14 +2,14 @@
 
 package imports
 
-//go:wasmimport opentelemetry.io/wasm getPluginConfig
+//go:wasmimport opentelemetry.io/wasm get_plugin_config
 func getPluginConfig(ptr, size uint32) (len uint32)
 
-//go:wasmimport opentelemetry.io/wasm setResultTraces
+//go:wasmimport opentelemetry.io/wasm set_result_traces
 func setResultTraces(ptr, size uint32)
 
-//go:wasmimport opentelemetry.io/wasm setResultMetrics
+//go:wasmimport opentelemetry.io/wasm set_result_metrics
 func setResultMetrics(ptr, size uint32)
 
-//go:wasmimport opentelemetry.io/wasm setResultLogs
+//go:wasmimport opentelemetry.io/wasm set_result_logs
 func setResultLogs(ptr, size uint32)

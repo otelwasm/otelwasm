@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sync"
 	"sync/atomic"
 
 	"github.com/stealthrocket/wasi-go"
@@ -27,26 +28,54 @@ const (
 	// otelWasm is the name of the host module
 	otelWasm = "opentelemetry.io/wasm"
 
+	// Host function exports for pull model compatibility.
+	currentTraces  = "currentTraces"
+	currentMetrics = "currentMetrics"
+	currentLogs    = "currentLogs"
+
 	// Host function exports
-	currentTraces         = "currentTraces"
-	currentMetrics        = "currentMetrics"
-	currentLogs           = "currentLogs"
-	setResultTraces       = "setResultTraces"
-	setResultMetrics      = "setResultMetrics"
-	setResultLogs         = "setResultLogs"
-	getPluginConfig       = "getPluginConfig"
-	setResultStatusReason = "setResultStatusReason"
-	getShutdownRequested  = "getShutdownRequested"
+	setResultTraces      = "set_result_traces"
+	setResultMetrics     = "set_result_metrics"
+	setResultLogs        = "set_result_logs"
+	getPluginConfig      = "get_plugin_config"
+	setStatusReason      = "set_status_reason"
+	getShutdownRequested = "get_shutdown_requested"
+
+	// Legacy host export names used by pre-migration modules.
+	legacySetResultTraces       = "setResultTraces"
+	legacySetResultMetrics      = "setResultMetrics"
+	legacySetResultLogs         = "setResultLogs"
+	legacyGetPluginConfig       = "getPluginConfig"
+	legacySetResultStatusReason = "setResultStatusReason"
+	legacyGetShutdownRequested  = "getShutdownRequested"
 
 	// Guest function
-	getSupportedTelemetry = "getSupportedTelemetry"
+	getSupportedTelemetry       = "get_supported_telemetry"
+	legacyGetSupportedTelemetry = "getSupportedTelemetry"
+	allocFunction               = "alloc"
+	consumeTracesFunction       = "consume_traces"
 
 	// WASI extension name
 	wasmEdgeV2Extension = "wasmedgev2"
 )
 
-var builtInGuestFunctions = []string{
-	getSupportedTelemetry,
+var builtInGuestFunctions = map[string][]string{
+	getSupportedTelemetry: {getSupportedTelemetry, legacyGetSupportedTelemetry},
+}
+
+var abiV1RequiredFunctions = map[string]struct{}{
+	"consume_traces":         {},
+	"consume_metrics":        {},
+	"consume_logs":           {},
+	"start":                  {},
+	"shutdown":               {},
+	"start_traces_receiver":  {},
+	"start_metrics_receiver": {},
+	"start_logs_receiver":    {},
+	// Legacy naming still used by non-migrated call sites.
+	"startTracesReceiver":  {},
+	"startMetricsReceiver": {},
+	"startLogsReceiver":    {},
 }
 
 type telemetryType uint32
@@ -76,6 +105,8 @@ func (s StatusCode) String() string {
 
 // WasmPlugin represents a WebAssembly plugin for OpenTelemetry components
 type WasmPlugin struct {
+	consumeMu sync.Mutex
+
 	// Runtime is the WebAssembly runtime
 	Runtime wazero.Runtime
 
@@ -84,6 +115,9 @@ type WasmPlugin struct {
 
 	// Module is the instantiated WASM module
 	Module api.Module
+
+	// ABIVersion is the detected ABI version implemented by the module.
+	ABIVersion ABIVersion
 
 	// PluginConfigJSON is the JSON representation of the plugin config
 	PluginConfigJSON []byte
@@ -103,9 +137,11 @@ type stackKey struct{}
 
 // Stack holds the data being passed between the host and the guest
 type Stack struct {
-	CurrentTraces     ptrace.Traces
-	CurrentMetrics    pmetric.Metrics
-	CurrentLogs       plog.Logs
+	// Current* fields are used by pre-push-model modules.
+	CurrentTraces  ptrace.Traces
+	CurrentMetrics pmetric.Metrics
+	CurrentLogs    plog.Logs
+
 	ResultTraces      ptrace.Traces
 	ResultMetrics     pmetric.Metrics
 	ResultLogs        plog.Logs
@@ -146,11 +182,15 @@ func NewWasmPlugin(ctx context.Context, cfg *Config, requiredFunctions []string)
 	if err != nil {
 		return nil, err
 	}
+	if requiresABIV1(requiredFunctions) && guest.ExportedFunctions()[abiVersionV1MarkerExport] == nil {
+		return nil, fmt.Errorf("wasm: %s is not exported: %w", abiVersionV1MarkerExport, ErrABIVersionMarkerNotExported)
+	}
 
 	// Instantiate WASI module (wasi_snapshot_preview1 and wasmedge socket extension)
 	var sys wasi.System
 	ctx, sys, err = wasigo.NewBuilder().
 		WithSocketsExtension(wasmEdgeV2Extension, guest).
+		WithStdio(int(os.Stdin.Fd()), int(os.Stdout.Fd()), int(os.Stderr.Fd())).
 		WithEnv(os.Environ()...).Instantiate(ctx, runtime)
 	if err != nil {
 		return nil, fmt.Errorf("wasm: error instantiating wasi module: %w", err)
@@ -176,6 +216,10 @@ func NewWasmPlugin(ctx context.Context, cfg *Config, requiredFunctions []string)
 	if err != nil {
 		return nil, fmt.Errorf("wasm: error instantiating guest: %w", err)
 	}
+	abiVersion := detectABIVersion(mod)
+	if requiresABIV1(requiredFunctions) && abiVersion != ABIV1 {
+		return nil, fmt.Errorf("wasm: %s is not exported: %w", abiVersionV1MarkerExport, ErrABIVersionMarkerNotExported)
+	}
 
 	// Check if all required functions are exported
 	exportedFunctions := make(map[string]api.Function)
@@ -188,12 +232,18 @@ func NewWasmPlugin(ctx context.Context, cfg *Config, requiredFunctions []string)
 	}
 
 	// Check if all built-in guest functions are exported
-	for _, funcName := range builtInGuestFunctions {
-		fn := mod.ExportedFunction(funcName)
-		if fn == nil {
-			return nil, fmt.Errorf("wasm: %s is not exported: %w", funcName, ErrRequiredFunctionNotExported)
+	for canonicalName, aliases := range builtInGuestFunctions {
+		var fn api.Function
+		for _, name := range aliases {
+			fn = mod.ExportedFunction(name)
+			if fn != nil {
+				break
+			}
 		}
-		exportedFunctions[funcName] = fn
+		if fn == nil {
+			return nil, fmt.Errorf("wasm: %s is not exported: %w", canonicalName, ErrRequiredFunctionNotExported)
+		}
+		exportedFunctions[canonicalName] = fn
 	}
 
 	// Convert the plugin config to JSON representation
@@ -206,12 +256,22 @@ func NewWasmPlugin(ctx context.Context, cfg *Config, requiredFunctions []string)
 		Runtime:           runtime,
 		Sys:               sys,
 		Module:            mod,
+		ABIVersion:        abiVersion,
 		PluginConfigJSON:  pluginConfigJSON,
 		ExportedFunctions: exportedFunctions,
 		wasiP1HostModule:  wasiP1HostModule,
 	}
 
 	return plugin, nil
+}
+
+func requiresABIV1(requiredFunctions []string) bool {
+	for _, name := range requiredFunctions {
+		if _, ok := abiV1RequiredFunctions[name]; ok {
+			return true
+		}
+	}
+	return false
 }
 
 // prepareRuntime initializes a new WebAssembly runtime
@@ -257,16 +317,82 @@ func createContextWithStack(ctx context.Context, stack *Stack) context.Context {
 
 // ProcessFunctionCall executes a WASM function and handles stack management
 func (p *WasmPlugin) ProcessFunctionCall(ctx context.Context, functionName string, stack *Stack) ([]uint64, error) {
-	ctx = createContextWithStack(ctx, stack)
-	// Set the WASI host module instance in the context
-	ctx = withModuleInstance(ctx, p.wasiP1HostModule)
-
 	fn, ok := p.ExportedFunctions[functionName]
 	if !ok {
 		return nil, fmt.Errorf("wasm: function not found: %s", functionName)
 	}
 
-	return fn.Call(ctx)
+	return p.callFunction(ctx, fn, stack)
+}
+
+func (p *WasmPlugin) callFunction(ctx context.Context, fn api.Function, stack *Stack, params ...uint64) ([]uint64, error) {
+	if stack == nil {
+		stack = &Stack{}
+	}
+	ctx = createContextWithStack(ctx, stack)
+	// Set the WASI host module instance in the context.
+	ctx = withModuleInstance(ctx, p.wasiP1HostModule)
+	return fn.Call(ctx, params...)
+}
+
+func (p *WasmPlugin) ConsumeTraces(ctx context.Context, td ptrace.Traces) (ptrace.Traces, error) {
+	p.consumeMu.Lock()
+	defer p.consumeMu.Unlock()
+
+	marshaler := ptrace.ProtoMarshaler{}
+	payload, err := marshaler.MarshalTraces(td)
+	if err != nil {
+		return td, fmt.Errorf("wasm: failed to marshal traces: %w", err)
+	}
+
+	stack := &Stack{PluginConfigJSON: p.PluginConfigJSON}
+	var dataPtr uint64
+	dataSize := uint64(len(payload))
+
+	if len(payload) > 0 {
+		allocFn := p.Module.ExportedFunction(allocFunction)
+		if allocFn == nil {
+			return td, fmt.Errorf("wasm: %s is not exported", allocFunction)
+		}
+
+		allocRes, allocErr := p.callFunction(ctx, allocFn, nil, dataSize)
+		if allocErr != nil {
+			return td, fmt.Errorf("wasm: failed to call %s: %w", allocFunction, allocErr)
+		}
+		if len(allocRes) == 0 || allocRes[0] == 0 {
+			return td, fmt.Errorf("wasm: alloc returned null for %d bytes", len(payload))
+		}
+
+		dataPtr = allocRes[0]
+		if !p.Module.Memory().Write(uint32(dataPtr), payload) {
+			return td, fmt.Errorf("wasm: failed to write traces payload to guest memory")
+		}
+	}
+
+	consumeFn, ok := p.ExportedFunctions[consumeTracesFunction]
+	if !ok {
+		consumeFn = p.Module.ExportedFunction(consumeTracesFunction)
+		if consumeFn == nil {
+			return td, fmt.Errorf("wasm: %s is not exported", consumeTracesFunction)
+		}
+	}
+
+	result, err := p.callFunction(ctx, consumeFn, stack, dataPtr, dataSize)
+	if err != nil {
+		return td, err
+	}
+	if len(result) == 0 {
+		return td, fmt.Errorf("wasm: %s returned no status code", consumeTracesFunction)
+	}
+	statusCode := StatusCode(result[0])
+	if statusCode != 0 {
+		return td, fmt.Errorf("wasm: error processing traces: %s: %s", statusCode.String(), stack.StatusReason)
+	}
+
+	if stack.ResultTraces != (ptrace.Traces{}) {
+		return stack.ResultTraces, nil
+	}
+	return td, nil
 }
 
 func (p *WasmPlugin) supportedTelemetryTypes(ctx context.Context) (telemetryType, error) {
@@ -442,7 +568,7 @@ func setResultLogsFn(ctx context.Context, mod api.Module, stack []uint64) {
 	}
 }
 
-func setResultStatusReasonFn(ctx context.Context, mod api.Module, stack []uint64) {
+func setStatusReasonFn(ctx context.Context, mod api.Module, stack []uint64) {
 	// Read buffer pointer and size from the stack
 	buf := uint32(stack[0])
 	size := uint32(stack[1])
@@ -473,20 +599,38 @@ func instantiateHostModule(ctx context.Context, runtime wazero.Runtime) (api.Mod
 		WithGoModuleFunction(api.GoModuleFunc(setResultTracesFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{}).
 		WithParameterNames("buf", "buf_len").Export(setResultTraces).
 		NewFunctionBuilder().
+		WithGoModuleFunction(api.GoModuleFunc(setResultTracesFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{}).
+		WithParameterNames("buf", "buf_len").Export(legacySetResultTraces).
+		NewFunctionBuilder().
 		WithGoModuleFunction(api.GoModuleFunc(setResultMetricsFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{}).
 		WithParameterNames("buf", "buf_len").Export(setResultMetrics).
+		NewFunctionBuilder().
+		WithGoModuleFunction(api.GoModuleFunc(setResultMetricsFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{}).
+		WithParameterNames("buf", "buf_len").Export(legacySetResultMetrics).
 		NewFunctionBuilder().
 		WithGoModuleFunction(api.GoModuleFunc(setResultLogsFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{}).
 		WithParameterNames("buf", "buf_len").Export(setResultLogs).
 		NewFunctionBuilder().
+		WithGoModuleFunction(api.GoModuleFunc(setResultLogsFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{}).
+		WithParameterNames("buf", "buf_len").Export(legacySetResultLogs).
+		NewFunctionBuilder().
 		WithGoModuleFunction(api.GoModuleFunc(getPluginConfigFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{api.ValueTypeI32}).
 		WithParameterNames("buf", "buf_limit").Export(getPluginConfig).
 		NewFunctionBuilder().
-		WithGoModuleFunction(api.GoModuleFunc(setResultStatusReasonFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{}).
-		WithParameterNames("buf", "buf_len").Export(setResultStatusReason).
+		WithGoModuleFunction(api.GoModuleFunc(getPluginConfigFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{api.ValueTypeI32}).
+		WithParameterNames("buf", "buf_limit").Export(legacyGetPluginConfig).
+		NewFunctionBuilder().
+		WithGoModuleFunction(api.GoModuleFunc(setStatusReasonFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{}).
+		WithParameterNames("buf", "buf_len").Export(setStatusReason).
+		NewFunctionBuilder().
+		WithGoModuleFunction(api.GoModuleFunc(setStatusReasonFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{}).
+		WithParameterNames("buf", "buf_len").Export(legacySetResultStatusReason).
 		NewFunctionBuilder().
 		WithGoModuleFunction(api.GoModuleFunc(getShutdownRequestedFn), []api.ValueType{}, []api.ValueType{api.ValueTypeI32}).
 		Export(getShutdownRequested).
+		NewFunctionBuilder().
+		WithGoModuleFunction(api.GoModuleFunc(getShutdownRequestedFn), []api.ValueType{}, []api.ValueType{api.ValueTypeI32}).
+		Export(legacyGetShutdownRequested).
 		Instantiate(ctx)
 }
 

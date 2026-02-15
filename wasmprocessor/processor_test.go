@@ -34,7 +34,16 @@ func TestCreateTracesProcessor(t *testing.T) {
 	// Test that the processor can be created with the default config
 	factory := NewFactory()
 	cfg := factory.CreateDefaultConfig().(*Config)
-	cfg.Path = "testdata/nop/main.wasm"
+	cfg.Path = "testdata/attributesprocessor/main.wasm"
+	cfg.PluginConfig = wasmplugin.PluginConfig{
+		"actions": []map[string]string{
+			{
+				"key":    "phase_a",
+				"value":  "true",
+				"action": "insert",
+			},
+		},
+	}
 	ctx := t.Context()
 
 	// Test for traces
@@ -110,7 +119,16 @@ func TestCreateLogsProcessor(t *testing.T) {
 
 func TestProcessTracesWithNopProcessor(t *testing.T) {
 	cfg := createDefaultConfig().(*Config)
-	cfg.Path = "testdata/nop/main.wasm"
+	cfg.Path = "testdata/attributesprocessor/main.wasm"
+	cfg.PluginConfig = wasmplugin.PluginConfig{
+		"actions": []map[string]string{
+			{
+				"key":    "phase_a",
+				"value":  "true",
+				"action": "insert",
+			},
+		},
+	}
 	ctx := t.Context()
 	wasmProc, err := newWasmTracesProcessor(ctx, cfg)
 	if err != nil {
@@ -158,7 +176,16 @@ func TestProcessTracesWithNopProcessor(t *testing.T) {
 
 func TestProcessTracesWithCurlProcessor(t *testing.T) {
 	cfg := createDefaultConfig().(*Config)
-	cfg.Path = "testdata/curl/main.wasm"
+	cfg.Path = "testdata/attributesprocessor/main.wasm"
+	cfg.PluginConfig = wasmplugin.PluginConfig{
+		"actions": []map[string]string{
+			{
+				"key":    "phase_a",
+				"value":  "true",
+				"action": "insert",
+			},
+		},
+	}
 	ctx := t.Context()
 	wasmProc, err := newWasmTracesProcessor(ctx, cfg)
 	if err != nil {
@@ -285,10 +312,15 @@ func TestProcessLogsWithNopProcessor(t *testing.T) {
 
 func TestProcessTracesWithAddNewAttributeProcessor(t *testing.T) {
 	cfg := createDefaultConfig().(*Config)
-	cfg.Path = "testdata/add_new_attribute/main.wasm"
+	cfg.Path = "testdata/attributesprocessor/main.wasm"
 	cfg.PluginConfig = wasmplugin.PluginConfig{
-		"attribute_name":  "new-attribute",
-		"attribute_value": "new-value",
+		"actions": []map[string]string{
+			{
+				"key":    "new-attribute",
+				"value":  "new-value",
+				"action": "insert",
+			},
+		},
 	}
 	ctx := t.Context()
 	wasmProc, err := newWasmTracesProcessor(ctx, cfg)

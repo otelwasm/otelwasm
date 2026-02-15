@@ -2,9 +2,11 @@
 # Some rules are copied from https://github.com/open-telemetry/opentelemetry-collector/blob/main/Makefile
 
 golangci_lint := github.com/golangci/golangci-lint/cmd/golangci-lint@v1.61.0
-wasibuilder   := github.com/otelwasm/wasibuilder@v0.0.6
+wasibuilder_mod := github.com/otelwasm/wasibuilder@v0.0.6
+wasibuilder    = $(shell $(GOCMD) list -m -f '{{.Dir}}' $(wasibuilder_mod))
 
 SRC_ROOT := $(shell git rev-parse --show-toplevel)
+GUEST_SOURCES := $(shell find guest -name '*.go' -type f)
 
 GOCMD?= go
 GO_BUILD_TAGS=""
@@ -35,7 +37,7 @@ test: copy-wasm-examples
 	@(cd guest; $(GOCMD) test -v -tags docker ./...)
 
 define build-wasm-example
-$(1): $(1:.wasm=.go)
+$(1): $(1:.wasm=.go) $(GUEST_SOURCES)
 	@(cd $$(patsubst %/main.wasm,%,$$@); $(GOCMD) run $(wasibuilder) $(GOCMD) build -buildmode=c-shared -o main.wasm main.go)
 endef
 

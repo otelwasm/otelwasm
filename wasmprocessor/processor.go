@@ -2,9 +2,11 @@ package wasmprocessor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/otelwasm/otelwasm/wasmplugin"
+	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/pdata/plog"
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.opentelemetry.io/collector/pdata/ptrace"
@@ -12,9 +14,11 @@ import (
 )
 
 const (
-	processTracesFunctionName  = "processTraces"
+	consumeTracesFunctionName  = "consume_traces"
 	processMetricsFunctionName = "processMetrics"
 	processLogsFunctionName    = "processLogs"
+	startFunctionName          = "start"
+	shutdownFunctionName       = "shutdown"
 )
 
 type wasmProcessor struct {
@@ -77,7 +81,7 @@ func newWasmTracesProcessor(ctx context.Context, cfg *Config) (*wasmProcessor, e
 	}
 
 	// Specify required functions for the processor
-	requiredFunctions := []string{processTracesFunctionName}
+	requiredFunctions := []string{consumeTracesFunctionName, startFunctionName, shutdownFunctionName}
 
 	// Initialize the WASM plugin
 	plugin, err := wasmplugin.NewWasmPlugin(ctx, &cfg.Config, requiredFunctions)
@@ -100,22 +104,7 @@ func (wp *wasmProcessor) processTraces(
 	ctx context.Context,
 	td ptrace.Traces,
 ) (ptrace.Traces, error) {
-	stack := &wasmplugin.Stack{
-		CurrentTraces:    td,
-		PluginConfigJSON: wp.plugin.PluginConfigJSON,
-	}
-
-	res, err := wp.plugin.ProcessFunctionCall(ctx, processTracesFunctionName, stack)
-	if err != nil {
-		return td, err
-	}
-
-	statusCode := wasmplugin.StatusCode(res[0])
-	if statusCode != 0 {
-		return td, fmt.Errorf("wasm: error processing traces: %s: %s", statusCode.String(), stack.StatusReason)
-	}
-
-	return stack.ResultTraces, nil
+	return wp.plugin.ConsumeTraces(ctx, td)
 }
 
 func (wp *wasmProcessor) processMetrics(
@@ -163,5 +152,39 @@ func (wp *wasmProcessor) processLogs(
 }
 
 func (wp *wasmProcessor) shutdown(ctx context.Context) error {
-	return wp.plugin.Shutdown(ctx)
+	var lifecycleErr error
+
+	if _, ok := wp.plugin.ExportedFunctions[shutdownFunctionName]; ok {
+		stack := &wasmplugin.Stack{PluginConfigJSON: wp.plugin.PluginConfigJSON}
+		res, err := wp.plugin.ProcessFunctionCall(ctx, shutdownFunctionName, stack)
+		if err != nil {
+			lifecycleErr = err
+		} else if len(res) == 0 {
+			lifecycleErr = fmt.Errorf("wasm: %s returned no status code", shutdownFunctionName)
+		} else {
+			statusCode := wasmplugin.StatusCode(res[0])
+			if statusCode != 0 {
+				lifecycleErr = fmt.Errorf("wasm: error shutting down processor: %s: %s", statusCode.String(), stack.StatusReason)
+			}
+		}
+	}
+
+	runtimeErr := wp.plugin.Shutdown(ctx)
+	return errors.Join(lifecycleErr, runtimeErr)
+}
+
+func (wp *wasmProcessor) start(ctx context.Context, _ component.Host) error {
+	stack := &wasmplugin.Stack{PluginConfigJSON: wp.plugin.PluginConfigJSON}
+	res, err := wp.plugin.ProcessFunctionCall(ctx, startFunctionName, stack)
+	if err != nil {
+		return err
+	}
+	if len(res) == 0 {
+		return fmt.Errorf("wasm: %s returned no status code", startFunctionName)
+	}
+	statusCode := wasmplugin.StatusCode(res[0])
+	if statusCode != 0 {
+		return fmt.Errorf("wasm: error starting processor: %s: %s", statusCode.String(), stack.StatusReason)
+	}
+	return nil
 }
