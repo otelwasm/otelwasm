@@ -15,8 +15,8 @@ import (
 
 const (
 	consumeTracesFunctionName  = "consume_traces"
-	processMetricsFunctionName = "processMetrics"
-	processLogsFunctionName    = "processLogs"
+	consumeMetricsFunctionName = "consume_metrics"
+	consumeLogsFunctionName    = "consume_logs"
 	startFunctionName          = "start"
 	shutdownFunctionName       = "shutdown"
 )
@@ -31,7 +31,7 @@ func newWasmMetricsProcessor(ctx context.Context, cfg *Config) (*wasmProcessor, 
 	}
 
 	// Specify required functions for the processor
-	requiredFunctions := []string{processMetricsFunctionName}
+	requiredFunctions := []string{consumeMetricsFunctionName}
 
 	// Initialize the WASM plugin
 	plugin, err := wasmplugin.NewWasmPlugin(ctx, &cfg.Config, requiredFunctions)
@@ -56,7 +56,7 @@ func newWasmLogsProcessor(ctx context.Context, cfg *Config) (*wasmProcessor, err
 	}
 
 	// Specify required functions for the processor
-	requiredFunctions := []string{processLogsFunctionName}
+	requiredFunctions := []string{consumeLogsFunctionName}
 
 	// Initialize the WASM plugin
 	plugin, err := wasmplugin.NewWasmPlugin(ctx, &cfg.Config, requiredFunctions)
@@ -111,44 +111,14 @@ func (wp *wasmProcessor) processMetrics(
 	ctx context.Context,
 	md pmetric.Metrics,
 ) (pmetric.Metrics, error) {
-	stack := &wasmplugin.Stack{
-		CurrentMetrics:   md,
-		PluginConfigJSON: wp.plugin.PluginConfigJSON,
-	}
-
-	res, err := wp.plugin.ProcessFunctionCall(ctx, processMetricsFunctionName, stack)
-	if err != nil {
-		return md, err
-	}
-
-	statusCode := wasmplugin.StatusCode(res[0])
-	if statusCode != 0 {
-		return md, fmt.Errorf("wasm: error processing metrics: %s: %s", statusCode.String(), stack.StatusReason)
-	}
-
-	return stack.ResultMetrics, nil
+	return wp.plugin.ConsumeMetrics(ctx, md)
 }
 
 func (wp *wasmProcessor) processLogs(
 	ctx context.Context,
 	ld plog.Logs,
 ) (plog.Logs, error) {
-	stack := &wasmplugin.Stack{
-		CurrentLogs:      ld,
-		PluginConfigJSON: wp.plugin.PluginConfigJSON,
-	}
-
-	res, err := wp.plugin.ProcessFunctionCall(ctx, processLogsFunctionName, stack)
-	if err != nil {
-		return ld, err
-	}
-
-	statusCode := wasmplugin.StatusCode(res[0])
-	if statusCode != 0 {
-		return ld, fmt.Errorf("wasm: error processing logs: %s: %s", statusCode.String(), stack.StatusReason)
-	}
-
-	return stack.ResultLogs, nil
+	return wp.plugin.ConsumeLogs(ctx, ld)
 }
 
 func (wp *wasmProcessor) shutdown(ctx context.Context) error {

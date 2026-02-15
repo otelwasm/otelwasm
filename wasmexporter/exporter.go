@@ -12,9 +12,9 @@ import (
 )
 
 const (
-	pushTracesFunctionName  = "pushTraces"
-	pushMetricsFunctionName = "pushMetrics"
-	pushLogsFunctionName    = "pushLogs"
+	consumeTracesFunctionName  = "consume_traces"
+	consumeMetricsFunctionName = "consume_metrics"
+	consumeLogsFunctionName    = "consume_logs"
 )
 
 type wasmExporter struct {
@@ -28,7 +28,7 @@ func newWasmTracesExporter(ctx context.Context, cfg *Config) (*wasmExporter, err
 	}
 
 	// Specify required functions for the traces exporter
-	requiredFunctions := []string{pushTracesFunctionName}
+	requiredFunctions := []string{consumeTracesFunctionName}
 
 	// Initialize the WASM plugin
 	plugin, err := wasmplugin.NewWasmPlugin(ctx, &cfg.Config, requiredFunctions)
@@ -55,7 +55,7 @@ func newWasmMetricsExporter(ctx context.Context, cfg *Config) (*wasmExporter, er
 	}
 
 	// Specify required functions for the metrics exporter
-	requiredFunctions := []string{pushMetricsFunctionName}
+	requiredFunctions := []string{consumeMetricsFunctionName}
 
 	// Initialize the WASM plugin
 	plugin, err := wasmplugin.NewWasmPlugin(ctx, &cfg.Config, requiredFunctions)
@@ -82,7 +82,7 @@ func newWasmLogsExporter(ctx context.Context, cfg *Config) (*wasmExporter, error
 	}
 
 	// Specify required functions for the logs exporter
-	requiredFunctions := []string{pushLogsFunctionName}
+	requiredFunctions := []string{consumeLogsFunctionName}
 
 	// Initialize the WASM plugin
 	plugin, err := wasmplugin.NewWasmPlugin(ctx, &cfg.Config, requiredFunctions)
@@ -106,66 +106,24 @@ func (wp *wasmExporter) pushTraces(
 	ctx context.Context,
 	td ptrace.Traces,
 ) error {
-	stack := &wasmplugin.Stack{
-		CurrentTraces:    td,
-		PluginConfigJSON: wp.plugin.PluginConfigJSON,
-	}
-
-	res, err := wp.plugin.ProcessFunctionCall(ctx, pushTracesFunctionName, stack)
-	if err != nil {
-		return err
-	}
-
-	statusCode := wasmplugin.StatusCode(res[0])
-	if statusCode != 0 {
-		return fmt.Errorf("wasm: error pushing traces: %s: %s", statusCode.String(), stack.StatusReason)
-	}
-
-	return nil
+	_, err := wp.plugin.ConsumeTraces(ctx, td)
+	return err
 }
 
 func (wp *wasmExporter) pushMetrics(
 	ctx context.Context,
 	md pmetric.Metrics,
 ) error {
-	stack := &wasmplugin.Stack{
-		CurrentMetrics:   md,
-		PluginConfigJSON: wp.plugin.PluginConfigJSON,
-	}
-
-	res, err := wp.plugin.ProcessFunctionCall(ctx, pushMetricsFunctionName, stack)
-	if err != nil {
-		return err
-	}
-
-	statusCode := wasmplugin.StatusCode(res[0])
-	if statusCode != 0 {
-		return fmt.Errorf("wasm: error pushing metrics: %s: %s", statusCode.String(), stack.StatusReason)
-	}
-
-	return nil
+	_, err := wp.plugin.ConsumeMetrics(ctx, md)
+	return err
 }
 
 func (wp *wasmExporter) pushLogs(
 	ctx context.Context,
 	ld plog.Logs,
 ) error {
-	stack := &wasmplugin.Stack{
-		CurrentLogs:      ld,
-		PluginConfigJSON: wp.plugin.PluginConfigJSON,
-	}
-
-	res, err := wp.plugin.ProcessFunctionCall(ctx, pushLogsFunctionName, stack)
-	if err != nil {
-		return err
-	}
-
-	statusCode := wasmplugin.StatusCode(res[0])
-	if statusCode != 0 {
-		return fmt.Errorf("wasm: error pushing logs: %s: %s", statusCode.String(), stack.StatusReason)
-	}
-
-	return nil
+	_, err := wp.plugin.ConsumeLogs(ctx, ld)
+	return err
 }
 
 func (wp *wasmExporter) shutdown(ctx context.Context) error {

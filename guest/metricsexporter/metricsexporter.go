@@ -3,7 +3,9 @@ package metricsexporter
 import (
 	"github.com/otelwasm/otelwasm/guest/api"
 	"github.com/otelwasm/otelwasm/guest/internal/imports"
+	"github.com/otelwasm/otelwasm/guest/internal/mem"
 	"github.com/otelwasm/otelwasm/guest/internal/plugin"
+	"go.opentelemetry.io/collector/pdata/pmetric"
 )
 
 var metricsexporter api.MetricsExporter
@@ -16,11 +18,17 @@ func SetPlugin(tp api.MetricsExporter) {
 	plugin.MustSet(tp)
 }
 
-var _ func() uint32 = _pushMetrics
+var _ func(uint32, uint32) uint32 = _consumeMetrics
 
-//go:wasmexport pushMetrics
-func _pushMetrics() uint32 {
-	metrics := imports.CurrentMetrics()
+//go:wasmexport consume_metrics
+func _consumeMetrics(dataPtr uint32, dataSize uint32) uint32 {
+	raw := mem.TakeOwnership(dataPtr, dataSize)
+	unmarshaler := pmetric.ProtoUnmarshaler{}
+	metrics, err := unmarshaler.UnmarshalMetrics(raw)
+	if err != nil {
+		return imports.StatusToCode(api.StatusError(err.Error()))
+	}
+
 	status := metricsexporter.PushMetrics(metrics)
 	return imports.StatusToCode(status)
 }

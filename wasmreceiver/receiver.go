@@ -16,6 +16,12 @@ import (
 	"go.uber.org/zap"
 )
 
+const (
+	startMetricsReceiverFunctionName = "start_metrics_receiver"
+	startLogsReceiverFunctionName    = "start_logs_receiver"
+	startTracesReceiverFunctionName  = "start_traces_receiver"
+)
+
 type Receiver struct {
 	cfg           *Config
 	set           receiver.Settings
@@ -33,7 +39,7 @@ func newMetricsWasmReceiver(ctx context.Context, cfg *Config, nextConsumerM cons
 		return ctx, nil, err
 	}
 
-	requiredFunctions := []string{"startMetricsReceiver"}
+	requiredFunctions := []string{startMetricsReceiverFunctionName}
 
 	plugin, err := wasmplugin.NewWasmPlugin(ctx, &cfg.Config, requiredFunctions)
 	if err != nil {
@@ -59,7 +65,7 @@ func newLogsWasmReceiver(ctx context.Context, cfg *Config, nextConsumerL consume
 		return ctx, nil, err
 	}
 
-	requiredFunctions := []string{"startLogsReceiver"}
+	requiredFunctions := []string{startLogsReceiverFunctionName}
 
 	plugin, err := wasmplugin.NewWasmPlugin(ctx, &cfg.Config, requiredFunctions)
 	if err != nil {
@@ -85,7 +91,7 @@ func newTracesWasmReceiver(ctx context.Context, cfg *Config, nextConsumerT consu
 		return ctx, nil, err
 	}
 
-	requiredFunctions := []string{"startTracesReceiver"}
+	requiredFunctions := []string{startTracesReceiverFunctionName}
 
 	plugin, err := wasmplugin.NewWasmPlugin(ctx, &cfg.Config, requiredFunctions)
 	if err != nil {
@@ -170,7 +176,7 @@ func (r *Receiver) Start(ctx context.Context, host component.Host) error {
 func (r *Receiver) runMetrics(ctx context.Context) {
 	defer r.wg.Done()
 
-	_, err := r.plugin.ProcessFunctionCall(ctx, "startMetricsReceiver", r.stack)
+	_, err := r.plugin.ProcessFunctionCall(ctx, startMetricsReceiverFunctionName, r.stack)
 	if err != nil {
 		r.set.Logger.Fatal("metrics receiver failed", zap.Error(err))
 	}
@@ -179,18 +185,18 @@ func (r *Receiver) runMetrics(ctx context.Context) {
 func (r *Receiver) runLogs(ctx context.Context) {
 	defer r.wg.Done()
 
-	_, err := r.plugin.ProcessFunctionCall(ctx, "startLogsReceiver", r.stack)
+	_, err := r.plugin.ProcessFunctionCall(ctx, startLogsReceiverFunctionName, r.stack)
 	if err != nil {
-		r.set.Logger.Fatal("metrics receiver failed", zap.Error(err))
+		r.set.Logger.Fatal("logs receiver failed", zap.Error(err))
 	}
 }
 
 func (r *Receiver) runTraces(ctx context.Context) {
 	defer r.wg.Done()
 
-	_, err := r.plugin.ProcessFunctionCall(ctx, "startTracesReceiver", r.stack)
+	_, err := r.plugin.ProcessFunctionCall(ctx, startTracesReceiverFunctionName, r.stack)
 	if err != nil {
-		r.set.Logger.Fatal("metrics receiver failed", zap.Error(err))
+		r.set.Logger.Fatal("traces receiver failed", zap.Error(err))
 	}
 }
 
@@ -211,10 +217,12 @@ func (r *Receiver) runTraces(ctx context.Context) {
 // the same or different configuration may be created and started (this may happen
 // for example if we want to restart the component).
 func (r *Receiver) Shutdown(ctx context.Context) error {
-	r.stack.RequestedShutdown.Store(true)
+	if r.stack != nil {
+		r.stack.RequestedShutdown.Store(true)
+	}
 	// TODO: Set timeout for shutdown
 
 	r.wg.Wait()
 
-	return nil
+	return r.plugin.Shutdown(ctx)
 }

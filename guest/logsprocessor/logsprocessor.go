@@ -6,6 +6,7 @@ import (
 	"github.com/otelwasm/otelwasm/guest/api"
 	pubimports "github.com/otelwasm/otelwasm/guest/imports"
 	"github.com/otelwasm/otelwasm/guest/internal/imports"
+	"github.com/otelwasm/otelwasm/guest/internal/mem"
 	"github.com/otelwasm/otelwasm/guest/internal/plugin"
 	"go.opentelemetry.io/collector/pdata/plog"
 )
@@ -20,11 +21,17 @@ func SetPlugin(lp api.LogsProcessor) {
 	plugin.MustSet(lp)
 }
 
-var _ func() uint32 = _processLogs
+var _ func(uint32, uint32) uint32 = _consumeLogs
 
-//go:wasmexport processLogs
-func _processLogs() uint32 {
-	logs := imports.CurrentLogs()
+//go:wasmexport consume_logs
+func _consumeLogs(dataPtr uint32, dataSize uint32) uint32 {
+	raw := mem.TakeOwnership(dataPtr, dataSize)
+	unmarshaler := plog.ProtoUnmarshaler{}
+	logs, err := unmarshaler.UnmarshalLogs(raw)
+	if err != nil {
+		return imports.StatusToCode(api.StatusError(err.Error()))
+	}
+
 	result, status := logsprocessor.ProcessLogs(logs)
 	// If the result is not empty, set it in the host.
 	// In case of empty result, the result should be written inside the guest call.

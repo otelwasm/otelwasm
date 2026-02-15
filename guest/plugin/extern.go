@@ -12,10 +12,16 @@ const (
 var supportedTelemetry TelemetryType = 0
 
 var (
-	_ func()        = _abiVersionV1
-	_ func() uint32 = _getSupportedTelemetry
-	_ func() uint32 = _start
-	_ func() uint32 = _shutdown
+	_ func()                      = _abiVersionV1
+	_ func() uint32               = _getSupportedTelemetry
+	_ func() uint32               = _start
+	_ func() uint32               = _shutdown
+	_ func(uint32, uint32) uint32 = _consumeTraces
+	_ func(uint32, uint32) uint32 = _consumeMetrics
+	_ func(uint32, uint32) uint32 = _consumeLogs
+	_ func()                      = _startTracesReceiver
+	_ func()                      = _startMetricsReceiver
+	_ func()                      = _startLogsReceiver
 )
 
 //go:wasmexport abi_version_v1

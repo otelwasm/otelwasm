@@ -21,7 +21,7 @@ func SetPlugin(mp api.MetricsReceiver) {
 
 var _ func() = _startMetricsReceiver
 
-//go:wasmexport startMetricsReceiver
+//go:wasmexport start_metrics_receiver
 func _startMetricsReceiver() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
