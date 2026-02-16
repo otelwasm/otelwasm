@@ -33,7 +33,7 @@ func TestABIV1BoundaryNegativeCases(t *testing.T) {
 		}
 	})
 
-	t.Run("rejects modules missing required consume_traces export", func(t *testing.T) {
+	t.Run("rejects modules missing required otelwasm_consume_traces export", func(t *testing.T) {
 		modPath := writeTempModule(t, buildTestModule(true, []wasmFunctionSpec{
 			{name: "_initialize", typeIndex: wasmTypeFunc0To0},
 			{name: abiVersionV1MarkerExport, typeIndex: wasmTypeFunc0To0},
@@ -56,7 +56,7 @@ func TestABIV1BoundaryNegativeCases(t *testing.T) {
 		}
 	})
 
-	t.Run("consume_traces returns alloc call failure", func(t *testing.T) {
+	t.Run("otelwasm_consume_traces returns alloc call failure", func(t *testing.T) {
 		// Export alloc with the wrong signature so the host call fails.
 		p := newPushTestPlugin(t, buildTestModule(true, []wasmFunctionSpec{
 			{name: allocFunction, typeIndex: wasmTypeFunc0To0},
@@ -69,7 +69,7 @@ func TestABIV1BoundaryNegativeCases(t *testing.T) {
 		}
 	})
 
-	t.Run("propagates status reason returned by consume_traces", func(t *testing.T) {
+	t.Run("propagates status reason returned by otelwasm_consume_traces", func(t *testing.T) {
 		modPath := writeTempModule(t, buildStatusReasonConsumeTracesModule("guest refused traces"))
 		p, err := NewWasmPlugin(ctx, &Config{
 			Path:          modPath,
@@ -86,7 +86,7 @@ func TestABIV1BoundaryNegativeCases(t *testing.T) {
 
 		_, err = p.ConsumeTraces(context.Background(), newNonEmptyTraces())
 		if err == nil {
-			t.Fatal("expected consume_traces error, got nil")
+			t.Fatal("expected otelwasm_consume_traces error, got nil")
 		}
 		if !strings.Contains(err.Error(), "ERROR") {
 			t.Fatalf("expected status string in error, got: %v", err)
@@ -112,7 +112,7 @@ func buildStatusReasonConsumeTracesModule(reason string) []byte {
 	// Type section:
 	// 0: (i32, i32) -> ()      [set_status_reason import]
 	// 1: (i32) -> i32          [alloc]
-	// 2: (i32, i32) -> i32     [consume_traces]
+	// 2: (i32, i32) -> i32     [otelwasm_consume_traces]
 	// 3: () -> ()              [abi marker / _initialize]
 	// 4: () -> i32             [get_supported_telemetry]
 	appendSection(0x01, []byte{
@@ -137,7 +137,7 @@ func buildStatusReasonConsumeTracesModule(reason string) []byte {
 	appendSection(0x03, []byte{
 		0x05, // 5 functions
 		0x01, // alloc
-		0x02, // consume_traces
+		0x02, // otelwasm_consume_traces
 		0x03, // abi_version_v1
 		0x04, // get_supported_telemetry
 		0x03, // _initialize
@@ -169,15 +169,15 @@ func buildStatusReasonConsumeTracesModule(reason string) []byte {
 	allocBody = append(allocBody, encodeULEB128Test(4096)...)
 	allocBody = append(allocBody, 0x0b)
 
-	// consume_traces(data_ptr, data_size):
+	// otelwasm_consume_traces(data_ptr, data_size):
 	//   call set_status_reason(reason_offset=32, reason_len=len(reason))
 	//   return ERROR(1)
 	consumeBody := []byte{
-		0x00,                   // local decl count
-		0x41, 0x20,             // i32.const 32
+		0x00,       // local decl count
+		0x41, 0x20, // i32.const 32
 		0x41, byte(len(reason)), // i32.const reason_len (len(reason) < 128 in tests)
-		0x10, 0x00,             // call function index 0 (imported set_status_reason)
-		0x41, 0x01,             // i32.const 1 (ERROR)
+		0x10, 0x00, // call function index 0 (imported set_status_reason)
+		0x41, 0x01, // i32.const 1 (ERROR)
 		0x0b, // end
 	}
 

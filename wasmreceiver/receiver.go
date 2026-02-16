@@ -17,9 +17,9 @@ import (
 )
 
 const (
-	startMetricsReceiverFunctionName = "start_metrics_receiver"
-	startLogsReceiverFunctionName    = "start_logs_receiver"
-	startTracesReceiverFunctionName  = "start_traces_receiver"
+	startMetricsReceiverFunctionName = "otelwasm_start_metrics_receiver"
+	startLogsReceiverFunctionName    = "otelwasm_start_logs_receiver"
+	startTracesReceiverFunctionName  = "otelwasm_start_traces_receiver"
 )
 
 type Receiver struct {

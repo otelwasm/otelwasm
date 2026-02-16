@@ -14,9 +14,9 @@ import (
 )
 
 const (
-	consumeTracesFunctionName  = "consume_traces"
-	consumeMetricsFunctionName = "consume_metrics"
-	consumeLogsFunctionName    = "consume_logs"
+	consumeTracesFunctionName  = "otelwasm_consume_traces"
+	consumeMetricsFunctionName = "otelwasm_consume_metrics"
+	consumeLogsFunctionName    = "otelwasm_consume_logs"
 	startFunctionName          = "start"
 	shutdownFunctionName       = "shutdown"
 )

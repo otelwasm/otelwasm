@@ -71,7 +71,7 @@ func Set(p api.Plugin) {
 	}
 }
 
-//go:wasmexport consume_traces
+//go:wasmexport otelwasm_consume_traces
 func _consumeTraces(dataPtr uint32, dataSize uint32) uint32 {
 	raw := mem.TakeOwnership(dataPtr, dataSize)
 	unmarshaler := ptrace.ProtoUnmarshaler{}
@@ -94,7 +94,7 @@ func _consumeTraces(dataPtr uint32, dataSize uint32) uint32 {
 	return imports.StatusToCode(api.StatusError("traces telemetry is not supported"))
 }
 
-//go:wasmexport consume_metrics
+//go:wasmexport otelwasm_consume_metrics
 func _consumeMetrics(dataPtr uint32, dataSize uint32) uint32 {
 	raw := mem.TakeOwnership(dataPtr, dataSize)
 	unmarshaler := pmetric.ProtoUnmarshaler{}
@@ -117,7 +117,7 @@ func _consumeMetrics(dataPtr uint32, dataSize uint32) uint32 {
 	return imports.StatusToCode(api.StatusError("metrics telemetry is not supported"))
 }
 
-//go:wasmexport consume_logs
+//go:wasmexport otelwasm_consume_logs
 func _consumeLogs(dataPtr uint32, dataSize uint32) uint32 {
 	raw := mem.TakeOwnership(dataPtr, dataSize)
 	unmarshaler := plog.ProtoUnmarshaler{}
@@ -140,7 +140,7 @@ func _consumeLogs(dataPtr uint32, dataSize uint32) uint32 {
 	return imports.StatusToCode(api.StatusError("logs telemetry is not supported"))
 }
 
-//go:wasmexport start_traces_receiver
+//go:wasmexport otelwasm_start_traces_receiver
 func _startTracesReceiver() {
 	runReceiverLoop(func(ctx context.Context) {
 		if tracesReceiver != nil {
@@ -149,7 +149,7 @@ func _startTracesReceiver() {
 	})
 }
 
-//go:wasmexport start_metrics_receiver
+//go:wasmexport otelwasm_start_metrics_receiver
 func _startMetricsReceiver() {
 	runReceiverLoop(func(ctx context.Context) {
 		if metricsReceiver != nil {
@@ -158,7 +158,7 @@ func _startMetricsReceiver() {
 	})
 }
 
-//go:wasmexport start_logs_receiver
+//go:wasmexport otelwasm_start_logs_receiver
 func _startLogsReceiver() {
 	runReceiverLoop(func(ctx context.Context) {
 		if logsReceiver != nil {

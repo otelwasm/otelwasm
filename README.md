@@ -11,13 +11,13 @@ The current ABI v1 host/guest contract uses a push model for telemetry payloads:
 - Guest MUST export `abi_version_v1()` as the ABI marker.
 - Guest MUST export `alloc(size: i32) -> i32` so the host can allocate guest memory for incoming payloads.
 - Host serializes telemetry and calls one of:
-  - `consume_traces(data_ptr, data_size) -> status`
-  - `consume_metrics(data_ptr, data_size) -> status`
-  - `consume_logs(data_ptr, data_size) -> status`
+  - `otelwasm_consume_traces(data_ptr, data_size) -> status`
+  - `otelwasm_consume_metrics(data_ptr, data_size) -> status`
+  - `otelwasm_consume_logs(data_ptr, data_size) -> status`
 - Receivers are started via:
-  - `start_traces_receiver()`
-  - `start_metrics_receiver()`
-  - `start_logs_receiver()`
+  - `otelwasm_start_traces_receiver()`
+  - `otelwasm_start_metrics_receiver()`
+  - `otelwasm_start_logs_receiver()`
 - Lifecycle functions remain `start() -> status` and `shutdown() -> status`.
 - On non-zero status returns, guests should call `set_status_reason(ptr, size)` so host-side errors include the guest-provided reason.
 

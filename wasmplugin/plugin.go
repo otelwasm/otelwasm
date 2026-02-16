@@ -48,9 +48,9 @@ const (
 	getSupportedTelemetry       = "get_supported_telemetry"
 	legacyGetSupportedTelemetry = "getSupportedTelemetry"
 	allocFunction               = "alloc"
-	consumeTracesFunction       = "consume_traces"
-	consumeMetricsFunction      = "consume_metrics"
-	consumeLogsFunction         = "consume_logs"
+	consumeTracesFunction       = "otelwasm_consume_traces"
+	consumeMetricsFunction      = "otelwasm_consume_metrics"
+	consumeLogsFunction         = "otelwasm_consume_logs"
 
 	// WASI extension name
 	wasmEdgeV2Extension = "wasmedgev2"
@@ -61,14 +61,14 @@ var builtInGuestFunctions = map[string][]string{
 }
 
 var abiV1RequiredFunctions = map[string]struct{}{
-	"consume_traces":         {},
-	"consume_metrics":        {},
-	"consume_logs":           {},
-	"start":                  {},
-	"shutdown":               {},
-	"start_traces_receiver":  {},
-	"start_metrics_receiver": {},
-	"start_logs_receiver":    {},
+	"otelwasm_consume_traces":         {},
+	"otelwasm_consume_metrics":        {},
+	"otelwasm_consume_logs":           {},
+	"start":                           {},
+	"shutdown":                        {},
+	"otelwasm_start_traces_receiver":  {},
+	"otelwasm_start_metrics_receiver": {},
+	"otelwasm_start_logs_receiver":    {},
 	// Legacy naming still used by non-migrated call sites.
 	"startTracesReceiver":  {},
 	"startMetricsReceiver": {},

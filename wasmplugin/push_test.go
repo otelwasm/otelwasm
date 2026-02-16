@@ -29,8 +29,8 @@ type wasmFunctionSpec struct {
 func TestPushModelConsumeTraces(t *testing.T) {
 	t.Run("returns error when alloc export is missing", func(t *testing.T) {
 		p := newPushTestPlugin(t, buildTestModule(true, []wasmFunctionSpec{
-			{name: "consume_traces", typeIndex: wasmTypeFuncI32I32ToI32, returnValue: uint32Ptr(0)},
-		}), []string{"consume_traces"})
+			{name: "otelwasm_consume_traces", typeIndex: wasmTypeFuncI32I32ToI32, returnValue: uint32Ptr(0)},
+		}), []string{"otelwasm_consume_traces"})
 
 		_, err := p.ConsumeTraces(context.Background(), newNonEmptyTraces())
 		if err == nil || !strings.Contains(err.Error(), "alloc") {
@@ -41,8 +41,8 @@ func TestPushModelConsumeTraces(t *testing.T) {
 	t.Run("returns error when alloc returns null pointer", func(t *testing.T) {
 		p := newPushTestPlugin(t, buildTestModule(true, []wasmFunctionSpec{
 			{name: "alloc", typeIndex: wasmTypeFuncI32ToI32, returnValue: uint32Ptr(0)},
-			{name: "consume_traces", typeIndex: wasmTypeFuncI32I32ToI32, returnValue: uint32Ptr(0)},
-		}), []string{"consume_traces"})
+			{name: "otelwasm_consume_traces", typeIndex: wasmTypeFuncI32I32ToI32, returnValue: uint32Ptr(0)},
+		}), []string{"otelwasm_consume_traces"})
 
 		_, err := p.ConsumeTraces(context.Background(), newNonEmptyTraces())
 		if err == nil || !strings.Contains(err.Error(), "alloc returned null") {
@@ -53,8 +53,8 @@ func TestPushModelConsumeTraces(t *testing.T) {
 	t.Run("returns error when guest memory write fails", func(t *testing.T) {
 		p := newPushTestPlugin(t, buildTestModule(true, []wasmFunctionSpec{
 			{name: "alloc", typeIndex: wasmTypeFuncI32ToI32, returnValue: uint32Ptr(65535)},
-			{name: "consume_traces", typeIndex: wasmTypeFuncI32I32ToI32, returnValue: uint32Ptr(0)},
-		}), []string{"consume_traces"})
+			{name: "otelwasm_consume_traces", typeIndex: wasmTypeFuncI32I32ToI32, returnValue: uint32Ptr(0)},
+		}), []string{"otelwasm_consume_traces"})
 
 		_, err := p.ConsumeTraces(context.Background(), newNonEmptyTraces())
 		if err == nil || !strings.Contains(err.Error(), "failed to write traces payload") {
@@ -62,11 +62,11 @@ func TestPushModelConsumeTraces(t *testing.T) {
 		}
 	})
 
-	t.Run("returns status error from consume_traces", func(t *testing.T) {
+	t.Run("returns status error from otelwasm_consume_traces", func(t *testing.T) {
 		p := newPushTestPlugin(t, buildTestModule(true, []wasmFunctionSpec{
 			{name: "alloc", typeIndex: wasmTypeFuncI32ToI32, returnValue: uint32Ptr(16)},
-			{name: "consume_traces", typeIndex: wasmTypeFuncI32I32ToI32, returnValue: uint32Ptr(1)},
-		}), []string{"consume_traces"})
+			{name: "otelwasm_consume_traces", typeIndex: wasmTypeFuncI32I32ToI32, returnValue: uint32Ptr(1)},
+		}), []string{"otelwasm_consume_traces"})
 
 		_, err := p.ConsumeTraces(context.Background(), newNonEmptyTraces())
 		if err == nil || !strings.Contains(err.Error(), "ERROR") {
@@ -77,8 +77,8 @@ func TestPushModelConsumeTraces(t *testing.T) {
 	t.Run("returns original traces when consume succeeds without result", func(t *testing.T) {
 		p := newPushTestPlugin(t, buildTestModule(true, []wasmFunctionSpec{
 			{name: "alloc", typeIndex: wasmTypeFuncI32ToI32, returnValue: uint32Ptr(16)},
-			{name: "consume_traces", typeIndex: wasmTypeFuncI32I32ToI32, returnValue: uint32Ptr(0)},
-		}), []string{"consume_traces"})
+			{name: "otelwasm_consume_traces", typeIndex: wasmTypeFuncI32I32ToI32, returnValue: uint32Ptr(0)},
+		}), []string{"otelwasm_consume_traces"})
 
 		in := newNonEmptyTraces()
 		out, err := p.ConsumeTraces(context.Background(), in)
@@ -105,7 +105,7 @@ func TestNewWasmPlugin(t *testing.T) {
 			RuntimeConfig: RuntimeConfig{Mode: RuntimeModeInterpreter},
 		}
 
-		p, err := NewWasmPlugin(ctx, cfg, []string{"consume_traces"})
+		p, err := NewWasmPlugin(ctx, cfg, []string{"otelwasm_consume_traces"})
 		if p != nil {
 			t.Fatal("expected nil plugin on ABI marker failure")
 		}
@@ -119,8 +119,8 @@ func TestNewWasmPlugin(t *testing.T) {
 }
 
 func TestRequiresABIV1(t *testing.T) {
-	if !requiresABIV1([]string{"consume_traces"}) {
-		t.Fatal("consume_traces should require ABI v1")
+	if !requiresABIV1([]string{"otelwasm_consume_traces"}) {
+		t.Fatal("otelwasm_consume_traces should require ABI v1")
 	}
 	if !requiresABIV1([]string{"start", "shutdown"}) {
 		t.Fatal("start/shutdown should require ABI v1")

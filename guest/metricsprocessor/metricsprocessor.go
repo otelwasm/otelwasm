@@ -23,7 +23,7 @@ func SetPlugin(mp api.MetricsProcessor) {
 
 var _ func(uint32, uint32) uint32 = _consumeMetrics
 
-//go:wasmexport consume_metrics
+//go:wasmexport otelwasm_consume_metrics
 func _consumeMetrics(dataPtr uint32, dataSize uint32) uint32 {
 	raw := mem.TakeOwnership(dataPtr, dataSize)
 	unmarshaler := pmetric.ProtoUnmarshaler{}

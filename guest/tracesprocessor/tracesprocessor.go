@@ -23,7 +23,7 @@ func SetPlugin(tp api.TracesProcessor) {
 
 var _ func(uint32, uint32) uint32 = _consumeTraces
 
-//go:wasmexport consume_traces
+//go:wasmexport otelwasm_consume_traces
 func _consumeTraces(dataPtr uint32, dataSize uint32) uint32 {
 	raw := mem.TakeOwnership(dataPtr, dataSize)
 	unmarshaler := ptrace.ProtoUnmarshaler{}

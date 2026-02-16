@@ -50,7 +50,7 @@ The project plans to provide guest SDKs for **Go**, **Rust**, and **Zig**. The p
 model is the standard WASM ABI pattern for host-to-guest data transfer and is
 significantly more natural for non-GC languages:
 
-| Language | Pull Model (`currentTraces` + two-pass buffer) | Push Model (`alloc` + `consume_traces`) |
+| Language | Pull Model (`currentTraces` + two-pass buffer) | Push Model (`alloc` + `otelwasm_consume_traces`) |
 |----------|------------------------------------------------|----------------------------------------|
 | **Go**   | Natural (current implementation)               | Requires GC pinning (see §3)           |
 | **Rust** | Verbose (manual buffer + retry logic)          | Natural (`std::alloc::alloc`)          |
@@ -65,7 +65,7 @@ standard `alloc` function, which is idiomatic in both languages.
 The push model directly maps to the Collector's consumer interfaces:
 
 ```
-consumer.ConsumeTraces(ctx, ptrace.Traces)  →  consume_traces(data_ptr, data_size)
+consumer.ConsumeTraces(ctx, ptrace.Traces)  →  otelwasm_consume_traces(data_ptr, data_size)
 ```
 
 This also enables a **unified interface** for processors and exporters — both implement
@@ -250,7 +250,7 @@ func (wp *wasmProcessor) processTraces(ctx context.Context, td ptrace.Traces) (p
 
     // 4. Call consumer function with pointer and size
     stack := &wasmplugin.Stack{PluginConfigJSON: wp.plugin.PluginConfigJSON}
-    results, err = wp.plugin.ProcessFunctionCall(ctx, "consume_traces", stack,
+    results, err = wp.plugin.ProcessFunctionCall(ctx, "otelwasm_consume_traces", stack,
         uint64(ptr), uint64(len(data)))
     if err != nil {
         return td, err
@@ -307,7 +307,7 @@ func _processTraces() uint32 {
 
 ```go
 // tracesprocessor.go (v1)
-//go:wasmexport consume_traces
+//go:wasmexport otelwasm_consume_traces
 func _consumeTraces(dataPtr uint32, dataSize uint32) uint32 {
     raw := mem.TakeOwnership(dataPtr, dataSize) // unpin + get buffer
     unmarshaler := ptrace.ProtoUnmarshaler{}
@@ -358,7 +358,7 @@ func detectABI(mod api.Module) ABIVersion {
 Suggested implementation sequence:
 
 1. **Guest `alloc` + pinning map** (`guest/internal/mem/alloc.go`)
-2. **Guest consumer exports** (`consume_traces/metrics/logs` with `TakeOwnership`)
+2. **Guest consumer exports** (`otelwasm_consume_traces/metrics/logs` with `TakeOwnership`)
 3. **Host push flow** (serialize → alloc → write → call consumer)
 4. **Remove pull host functions** (`currentTraces/Metrics/Logs`)
 5. **Host ABI detection** (dual support for experimental + v1)

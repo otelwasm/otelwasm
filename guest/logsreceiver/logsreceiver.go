@@ -21,7 +21,7 @@ func SetPlugin(mp api.LogsReceiver) {
 
 var _ func() = _startLogsReceiver
 
-//go:wasmexport start_logs_receiver
+//go:wasmexport otelwasm_start_logs_receiver
 func _startLogsReceiver() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

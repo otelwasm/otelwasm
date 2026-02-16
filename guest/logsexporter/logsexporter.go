@@ -20,7 +20,7 @@ func SetPlugin(tp api.LogsExporter) {
 
 var _ func(uint32, uint32) uint32 = _consumeLogs
 
-//go:wasmexport consume_logs
+//go:wasmexport otelwasm_consume_logs
 func _consumeLogs(dataPtr uint32, dataSize uint32) uint32 {
 	raw := mem.TakeOwnership(dataPtr, dataSize)
 	unmarshaler := plog.ProtoUnmarshaler{}
