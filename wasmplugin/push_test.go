@@ -8,32 +8,32 @@ import (
 )
 
 func TestPushModelConsumeTraces(t *testing.T) {
-	t.Run("returns error when alloc export is missing", func(t *testing.T) {
+	t.Run("returns error when memory allocate export is missing", func(t *testing.T) {
 		p := newPushTestPlugin(t, buildTestModule(true, []wasmFunctionSpec{
 			{name: consumeTracesFunction, typeIndex: wasmTypeFuncI32I32ToI32, returnValue: uint32Ptr(0)},
 		}), []string{consumeTracesFunction})
 
 		_, err := p.ConsumeTraces(context.Background(), newNonEmptyTraces())
-		if err == nil || !strings.Contains(err.Error(), "alloc") {
-			t.Fatalf("expected alloc error, got: %v", err)
+		if err == nil || !strings.Contains(err.Error(), memoryAllocateFunction) {
+			t.Fatalf("expected missing %q error, got: %v", memoryAllocateFunction, err)
 		}
 	})
 
-	t.Run("returns error when alloc returns null pointer", func(t *testing.T) {
+	t.Run("returns error when memory allocate returns null pointer", func(t *testing.T) {
 		p := newPushTestPlugin(t, buildTestModule(true, []wasmFunctionSpec{
-			{name: allocFunction, typeIndex: wasmTypeFuncI32ToI32, returnValue: uint32Ptr(0)},
+			{name: memoryAllocateFunction, typeIndex: wasmTypeFuncI32ToI32, returnValue: uint32Ptr(0)},
 			{name: consumeTracesFunction, typeIndex: wasmTypeFuncI32I32ToI32, returnValue: uint32Ptr(0)},
 		}), []string{consumeTracesFunction})
 
 		_, err := p.ConsumeTraces(context.Background(), newNonEmptyTraces())
-		if err == nil || !strings.Contains(err.Error(), "alloc returned null") {
-			t.Fatalf("expected null alloc error, got: %v", err)
+		if err == nil || !strings.Contains(err.Error(), memoryAllocateFunction+" returned null") {
+			t.Fatalf("expected null %q error, got: %v", memoryAllocateFunction, err)
 		}
 	})
 
 	t.Run("returns error when guest memory write fails", func(t *testing.T) {
 		p := newPushTestPlugin(t, buildTestModule(true, []wasmFunctionSpec{
-			{name: allocFunction, typeIndex: wasmTypeFuncI32ToI32, returnValue: uint32Ptr(65535)},
+			{name: memoryAllocateFunction, typeIndex: wasmTypeFuncI32ToI32, returnValue: uint32Ptr(65535)},
 			{name: consumeTracesFunction, typeIndex: wasmTypeFuncI32I32ToI32, returnValue: uint32Ptr(0)},
 		}), []string{consumeTracesFunction})
 
@@ -45,7 +45,7 @@ func TestPushModelConsumeTraces(t *testing.T) {
 
 	t.Run("returns status error from otelwasm_consume_traces", func(t *testing.T) {
 		p := newPushTestPlugin(t, buildTestModule(true, []wasmFunctionSpec{
-			{name: allocFunction, typeIndex: wasmTypeFuncI32ToI32, returnValue: uint32Ptr(16)},
+			{name: memoryAllocateFunction, typeIndex: wasmTypeFuncI32ToI32, returnValue: uint32Ptr(16)},
 			{name: consumeTracesFunction, typeIndex: wasmTypeFuncI32I32ToI32, returnValue: uint32Ptr(1)},
 		}), []string{consumeTracesFunction})
 
@@ -57,7 +57,7 @@ func TestPushModelConsumeTraces(t *testing.T) {
 
 	t.Run("returns original traces when consume succeeds without result", func(t *testing.T) {
 		p := newPushTestPlugin(t, buildTestModule(true, []wasmFunctionSpec{
-			{name: allocFunction, typeIndex: wasmTypeFuncI32ToI32, returnValue: uint32Ptr(16)},
+			{name: memoryAllocateFunction, typeIndex: wasmTypeFuncI32ToI32, returnValue: uint32Ptr(16)},
 			{name: consumeTracesFunction, typeIndex: wasmTypeFuncI32I32ToI32, returnValue: uint32Ptr(0)},
 		}), []string{consumeTracesFunction})
 

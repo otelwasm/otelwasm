@@ -47,7 +47,7 @@ const (
 	// Guest function
 	getSupportedTelemetry       = "get_supported_telemetry"
 	legacyGetSupportedTelemetry = "getSupportedTelemetry"
-	allocFunction               = "alloc"
+	memoryAllocateFunction      = "otelwasm_memory_allocate"
 	consumeTracesFunction       = "otelwasm_consume_traces"
 	consumeMetricsFunction      = "otelwasm_consume_metrics"
 	consumeLogsFunction         = "otelwasm_consume_logs"
@@ -342,17 +342,17 @@ func (p *WasmPlugin) ConsumeTraces(ctx context.Context, td ptrace.Traces) (ptrac
 	dataSize := uint64(len(payload))
 
 	if len(payload) > 0 {
-		allocFn := p.Module.ExportedFunction(allocFunction)
+		allocFn := p.Module.ExportedFunction(memoryAllocateFunction)
 		if allocFn == nil {
-			return td, fmt.Errorf("wasm: %s is not exported", allocFunction)
+			return td, fmt.Errorf("wasm: %s is not exported", memoryAllocateFunction)
 		}
 
 		allocRes, allocErr := p.callFunction(ctx, allocFn, nil, dataSize)
 		if allocErr != nil {
-			return td, fmt.Errorf("wasm: failed to call %s: %w", allocFunction, allocErr)
+			return td, fmt.Errorf("wasm: failed to call %s: %w", memoryAllocateFunction, allocErr)
 		}
 		if len(allocRes) == 0 || allocRes[0] == 0 {
-			return td, fmt.Errorf("wasm: alloc returned null for %d bytes", len(payload))
+			return td, fmt.Errorf("wasm: %s returned null for %d bytes", memoryAllocateFunction, len(payload))
 		}
 
 		dataPtr = allocRes[0]
@@ -402,17 +402,17 @@ func (p *WasmPlugin) ConsumeMetrics(ctx context.Context, md pmetric.Metrics) (pm
 	dataSize := uint64(len(payload))
 
 	if len(payload) > 0 {
-		allocFn := p.Module.ExportedFunction(allocFunction)
+		allocFn := p.Module.ExportedFunction(memoryAllocateFunction)
 		if allocFn == nil {
-			return md, fmt.Errorf("wasm: %s is not exported", allocFunction)
+			return md, fmt.Errorf("wasm: %s is not exported", memoryAllocateFunction)
 		}
 
 		allocRes, allocErr := p.callFunction(ctx, allocFn, nil, dataSize)
 		if allocErr != nil {
-			return md, fmt.Errorf("wasm: failed to call %s: %w", allocFunction, allocErr)
+			return md, fmt.Errorf("wasm: failed to call %s: %w", memoryAllocateFunction, allocErr)
 		}
 		if len(allocRes) == 0 || allocRes[0] == 0 {
-			return md, fmt.Errorf("wasm: alloc returned null for %d bytes", len(payload))
+			return md, fmt.Errorf("wasm: %s returned null for %d bytes", memoryAllocateFunction, len(payload))
 		}
 
 		dataPtr = allocRes[0]
@@ -462,17 +462,17 @@ func (p *WasmPlugin) ConsumeLogs(ctx context.Context, ld plog.Logs) (plog.Logs, 
 	dataSize := uint64(len(payload))
 
 	if len(payload) > 0 {
-		allocFn := p.Module.ExportedFunction(allocFunction)
+		allocFn := p.Module.ExportedFunction(memoryAllocateFunction)
 		if allocFn == nil {
-			return ld, fmt.Errorf("wasm: %s is not exported", allocFunction)
+			return ld, fmt.Errorf("wasm: %s is not exported", memoryAllocateFunction)
 		}
 
 		allocRes, allocErr := p.callFunction(ctx, allocFn, nil, dataSize)
 		if allocErr != nil {
-			return ld, fmt.Errorf("wasm: failed to call %s: %w", allocFunction, allocErr)
+			return ld, fmt.Errorf("wasm: failed to call %s: %w", memoryAllocateFunction, allocErr)
 		}
 		if len(allocRes) == 0 || allocRes[0] == 0 {
-			return ld, fmt.Errorf("wasm: alloc returned null for %d bytes", len(payload))
+			return ld, fmt.Errorf("wasm: %s returned null for %d bytes", memoryAllocateFunction, len(payload))
 		}
 
 		dataPtr = allocRes[0]

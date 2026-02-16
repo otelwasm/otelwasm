@@ -11,7 +11,7 @@ var pinnedAllocations = map[uint32][]byte{}
 
 // Alloc allocates and pins a byte buffer in guest memory.
 //
-//go:wasmexport alloc
+//go:wasmexport otelwasm_memory_allocate
 func Alloc(size uint32) uint32 {
 	if size == 0 {
 		return 0

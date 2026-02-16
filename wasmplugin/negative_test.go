@@ -13,7 +13,7 @@ func TestABIV1BoundaryNegativeCases(t *testing.T) {
 	t.Run("rejects modules without abi_version_v1 export", func(t *testing.T) {
 		modPath := writeTempModule(t, buildTestModule(true, []wasmFunctionSpec{
 			{name: "_initialize", typeIndex: wasmTypeFunc0To0},
-			{name: allocFunction, typeIndex: wasmTypeFuncI32ToI32, returnValue: uint32Ptr(16)},
+			{name: memoryAllocateFunction, typeIndex: wasmTypeFuncI32ToI32, returnValue: uint32Ptr(16)},
 			{name: consumeTracesFunction, typeIndex: wasmTypeFuncI32I32ToI32, returnValue: uint32Ptr(0)},
 			{name: getSupportedTelemetry, typeIndex: wasmTypeFunc0ToI32, returnValue: uint32Ptr(uint32(telemetryTypeTraces))},
 		}))
@@ -37,7 +37,7 @@ func TestABIV1BoundaryNegativeCases(t *testing.T) {
 		modPath := writeTempModule(t, buildTestModule(true, []wasmFunctionSpec{
 			{name: "_initialize", typeIndex: wasmTypeFunc0To0},
 			{name: abiVersionV1MarkerExport, typeIndex: wasmTypeFunc0To0},
-			{name: allocFunction, typeIndex: wasmTypeFuncI32ToI32, returnValue: uint32Ptr(16)},
+			{name: memoryAllocateFunction, typeIndex: wasmTypeFuncI32ToI32, returnValue: uint32Ptr(16)},
 			{name: getSupportedTelemetry, typeIndex: wasmTypeFunc0ToI32, returnValue: uint32Ptr(uint32(telemetryTypeTraces))},
 		}))
 
@@ -56,16 +56,16 @@ func TestABIV1BoundaryNegativeCases(t *testing.T) {
 		}
 	})
 
-	t.Run("otelwasm_consume_traces returns alloc call failure", func(t *testing.T) {
-		// Export alloc with the wrong signature so the host call fails.
+	t.Run("otelwasm_consume_traces returns memory allocate call failure", func(t *testing.T) {
+		// Export memory allocate with the wrong signature so the host call fails.
 		p := newPushTestPlugin(t, buildTestModule(true, []wasmFunctionSpec{
-			{name: allocFunction, typeIndex: wasmTypeFunc0To0},
+			{name: memoryAllocateFunction, typeIndex: wasmTypeFunc0To0},
 			{name: consumeTracesFunction, typeIndex: wasmTypeFuncI32I32ToI32, returnValue: uint32Ptr(0)},
 		}), []string{consumeTracesFunction})
 
 		_, err := p.ConsumeTraces(context.Background(), newNonEmptyTraces())
-		if err == nil || !strings.Contains(err.Error(), "failed to call alloc") {
-			t.Fatalf("expected alloc call failure, got: %v", err)
+		if err == nil || !strings.Contains(err.Error(), "failed to call "+memoryAllocateFunction) {
+			t.Fatalf("expected %q call failure, got: %v", memoryAllocateFunction, err)
 		}
 	})
 

@@ -18,7 +18,7 @@ func FuzzConsumeTracesBoundary(f *testing.F) {
 		}
 
 		p := newPushTestPlugin(t, buildTestModule(true, []wasmFunctionSpec{
-			{name: allocFunction, typeIndex: wasmTypeFuncI32ToI32, returnValue: uint32Ptr(16)},
+			{name: memoryAllocateFunction, typeIndex: wasmTypeFuncI32ToI32, returnValue: uint32Ptr(16)},
 			{name: consumeTracesFunction, typeIndex: wasmTypeFuncI32I32ToI32, returnValue: uint32Ptr(0)},
 		}), []string{consumeTracesFunction})
 

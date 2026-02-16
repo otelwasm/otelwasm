@@ -17,7 +17,7 @@ func buildStatusReasonConsumeTracesModule(reason string) []byte {
 
 	// Type section:
 	// 0: (i32, i32) -> ()      [set_status_reason import]
-	// 1: (i32) -> i32          [alloc]
+	// 1: (i32) -> i32          [otelwasm_memory_allocate]
 	// 2: (i32, i32) -> i32     [otelwasm_consume_traces]
 	// 3: () -> ()              [abi marker / _initialize]
 	// 4: () -> i32             [get_supported_telemetry]
@@ -42,7 +42,7 @@ func buildStatusReasonConsumeTracesModule(reason string) []byte {
 	// Function section: 5 local functions (indices 1..5).
 	appendSection(0x03, []byte{
 		0x05, // 5 functions
-		0x01, // alloc
+		0x01, // otelwasm_memory_allocate
 		0x02, // otelwasm_consume_traces
 		0x03, // abi_version_v1
 		0x04, // get_supported_telemetry
@@ -62,7 +62,7 @@ func buildStatusReasonConsumeTracesModule(reason string) []byte {
 	exportPayload = append(exportPayload, encodeULEB128Test(uint32(len(guestExportMemory)))...)
 	exportPayload = append(exportPayload, guestExportMemory...)
 	exportPayload = append(exportPayload, 0x02, 0x00) // memory index 0
-	exportPayload = appendExportedFunc(exportPayload, allocFunction, 1)
+	exportPayload = appendExportedFunc(exportPayload, memoryAllocateFunction, 1)
 	exportPayload = appendExportedFunc(exportPayload, consumeTracesFunction, 2)
 	exportPayload = appendExportedFunc(exportPayload, abiVersionV1MarkerExport, 3)
 	exportPayload = appendExportedFunc(exportPayload, getSupportedTelemetry, 4)
@@ -70,7 +70,7 @@ func buildStatusReasonConsumeTracesModule(reason string) []byte {
 	appendSection(0x07, exportPayload)
 
 	// Code section.
-	// alloc(size) -> i32.const 4096
+	// otelwasm_memory_allocate(size) -> i32.const 4096
 	allocBody := []byte{0x00, 0x41}
 	allocBody = append(allocBody, encodeULEB128Test(4096)...)
 	allocBody = append(allocBody, 0x0b)

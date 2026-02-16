@@ -41,7 +41,7 @@ See `guest/internal/mem/mem.go` for the buffer management implementation.
 ## 2. Decision: Adopt Push Model
 
 We decided to adopt a **push model** for ABI v1. The host serializes telemetry data,
-allocates memory in the guest via `alloc()`, writes the data, and calls the guest's
+allocates memory in the guest via `otelwasm_memory_allocate()`, writes the data, and calls the guest's
 consumer function with the pointer and size.
 
 ### 2.1 Primary Motivation: Multi-Language SDK Support
@@ -50,7 +50,7 @@ The project plans to provide guest SDKs for **Go**, **Rust**, and **Zig**. The p
 model is the standard WASM ABI pattern for host-to-guest data transfer and is
 significantly more natural for non-GC languages:
 
-| Language | Pull Model (`currentTraces` + two-pass buffer) | Push Model (`alloc` + `otelwasm_consume_traces`) |
+| Language | Pull Model (`currentTraces` + two-pass buffer) | Push Model (`otelwasm_memory_allocate` + `otelwasm_consume_traces`) |
 |----------|------------------------------------------------|----------------------------------------|
 | **Go**   | Natural (current implementation)               | Requires GC pinning (see §3)           |
 | **Rust** | Verbose (manual buffer + retry logic)          | Natural (`std::alloc::alloc`)          |
@@ -58,7 +58,7 @@ significantly more natural for non-GC languages:
 
 For Rust and Zig, the pull model requires implementing the two-pass buffer retry
 protocol, which is non-trivial boilerplate. The push model only requires exporting a
-standard `alloc` function, which is idiomatic in both languages.
+standard `otelwasm_memory_allocate` function, which is idiomatic in both languages.
 
 ### 2.2 Alignment with OpenTelemetry Collector Interfaces
 
@@ -77,7 +77,7 @@ This also enables a **unified interface** for processors and exporters — both 
 | Aspect | Pull Model | Push Model |
 |--------|-----------|-----------|
 | Serialization timing | Lazy (on demand) | Eager (before call) |
-| Host→Guest calls per invocation | 1 (consumer fn) | 2 (alloc + consumer fn) |
+| Host→Guest calls per invocation | 1 (consumer fn) | 2 (otelwasm_memory_allocate + consumer fn) |
 | Guest→Host calls per invocation | 2-3 (get data + set result) | 1 (set result) |
 | Re-entrancy requirement | Yes (host→guest→host) | No |
 | Standard WASM pattern | Uncommon | Common (proxy-wasm, etc.) |
@@ -87,17 +87,17 @@ process data (e.g., based on config), the serialization cost is avoided. However
 practice, processors and exporters almost always need the full telemetry data, making
 this advantage marginal.
 
-## 3. Go Guest SDK: GC-Safe `alloc` Implementation
+## 3. Go Guest SDK: GC-Safe `otelwasm_memory_allocate` Implementation
 
 The primary implementation challenge for the push model in Go is preventing the garbage
-collector from reclaiming memory allocated by `alloc()` before the host writes to it.
+collector from reclaiming memory allocated by `otelwasm_memory_allocate()` before the host writes to it.
 
 ### 3.1 The Problem
 
 ```go
 // UNSAFE: buf has no live reference after alloc returns
-//go:wasmexport alloc
-func alloc(size uint32) uint32 {
+//go:wasmexport otelwasm_memory_allocate
+func otelwasm_memory_allocate(size uint32) uint32 {
     buf := make([]byte, size)       // allocated on Go heap
     return uint32(uintptr(unsafe.Pointer(&buf[0])))
     // buf goes out of scope → GC may collect before host writes
@@ -107,10 +107,10 @@ func alloc(size uint32) uint32 {
 ### 3.2 Why It "Mostly Works" Without Pinning
 
 WASM is single-threaded, and Go's GC only triggers during allocation (`make`, `new`,
-etc.). The host-side sequence between `alloc()` and `consume_*()` is:
+etc.). The host-side sequence between `otelwasm_memory_allocate()` and `consume_*()` is:
 
 ```
-1. Host calls alloc(size)       → Guest executes, returns ptr
+1. Host calls otelwasm_memory_allocate(size)       → Guest executes, returns ptr
 2. Host calls memory.Write(…)   → Direct memory write, no guest code runs
 3. Host calls consume_*(ptr, …) → Guest executes, reads data
 ```
@@ -133,7 +133,7 @@ import "unsafe"
 // preventing Go GC from collecting them.
 var pinnedAllocations = make(map[uintptr][]byte)
 
-//go:wasmexport alloc
+//go:wasmexport otelwasm_memory_allocate
 func Alloc(size uint32) uint32 {
     buf := make([]byte, size)
     ptr := uintptr(unsafe.Pointer(&buf[0]))
@@ -182,9 +182,9 @@ Alternative approaches considered but not adopted for otelwasm:
 - **nottinygc (bdwgc)**: Replaces TinyGo GC with Boehm GC. TinyGo-only; otelwasm uses standard Go.
 - **C.malloc via cgo**: Allocates outside Go heap. Not available in WASM target.
 
-## 4. Rust / Zig Guest SDK: `alloc` Implementation
+## 4. Rust / Zig Guest SDK: `otelwasm_memory_allocate` Implementation
 
-For non-GC languages, `alloc` is straightforward.
+For non-GC languages, `otelwasm_memory_allocate` is straightforward.
 
 ### 4.1 Rust
 
@@ -192,7 +192,7 @@ For non-GC languages, `alloc` is straightforward.
 use std::alloc::{alloc, Layout};
 
 #[no_mangle]
-pub extern "C" fn alloc(size: i32) -> i32 {
+pub extern "C" fn otelwasm_memory_allocate(size: i32) -> i32 {
     let Ok(layout) = Layout::from_size_align(size as usize, 1) else {
         return 0; // allocation failure
     };
@@ -214,7 +214,7 @@ const std = @import("std");
 
 var gpa = std.heap.wasm_allocator;
 
-export fn alloc(size: i32) i32 {
+export fn otelwasm_memory_allocate(size: i32) i32 {
     const slice = gpa.alloc(u8, @intCast(size)) catch return 0;
     return @intCast(@intFromPtr(slice.ptr));
 }
@@ -234,13 +234,13 @@ func (wp *wasmProcessor) processTraces(ctx context.Context, td ptrace.Traces) (p
     }
 
     // 2. Allocate memory in guest
-    results, err := wp.plugin.CallFunction(ctx, "alloc", uint64(len(data)))
+    results, err := wp.plugin.CallFunction(ctx, "otelwasm_memory_allocate", uint64(len(data)))
     if err != nil {
-        return td, fmt.Errorf("alloc: %w", err)
+        return td, fmt.Errorf("otelwasm_memory_allocate: %w", err)
     }
     ptr := uint32(results[0])
     if ptr == 0 {
-        return td, fmt.Errorf("alloc returned null for %d bytes", len(data))
+        return td, fmt.Errorf("otelwasm_memory_allocate returned null for %d bytes", len(data))
     }
 
     // 3. Write data to guest memory
@@ -357,9 +357,9 @@ func detectABI(mod api.Module) ABIVersion {
 
 Suggested implementation sequence:
 
-1. **Guest `alloc` + pinning map** (`guest/internal/mem/alloc.go`)
+1. **Guest `otelwasm_memory_allocate` + pinning map** (`guest/internal/mem/alloc.go`)
 2. **Guest consumer exports** (`otelwasm_consume_traces/metrics/logs` with `TakeOwnership`)
-3. **Host push flow** (serialize → alloc → write → call consumer)
+3. **Host push flow** (serialize → otelwasm_memory_allocate → write → call consumer)
 4. **Remove pull host functions** (`currentTraces/Metrics/Logs`)
 5. **Host ABI detection** (dual support for experimental + v1)
 6. **snake_case rename** for all functions
@@ -368,7 +368,7 @@ Suggested implementation sequence:
 
 ## 8. Open Questions
 
-- **`alloc` failure handling**: Should the host retry with a smaller batch, or
+- **`otelwasm_memory_allocate` failure handling**: Should the host retry with a smaller batch, or
   immediately propagate the error? The current spec says propagate, but retry may be
   desirable for large batches.
 - **`dealloc` export**: ✓ **Resolved** — After surveying other WASM ABIs (proxy-wasm,
@@ -411,7 +411,7 @@ deallocation, allowing flexible internal heap strategies.
 ### 9.2 HTTP-WASM Handler ABI
 
 **Allocation:**
-- **No `malloc` or `alloc` function at all**
+- **No `malloc` or `otelwasm_memory_allocate` function at all**
 - Uses a buffer-passing pattern instead
 
 **Pattern:**
@@ -469,7 +469,7 @@ Based on this survey, we concluded that omitting an explicit `dealloc` host func
 #### Option 1: Export `dealloc(ptr, size)`
 
 **Pros:**
-- Symmetric API (`alloc` + `dealloc`)
+- Symmetric API (`otelwasm_memory_allocate` + `dealloc`)
 - Host could explicitly free memory after processing
 
 **Cons:**
@@ -518,12 +518,12 @@ Each language's guest SDK handles memory differently:
 - Memory freed by Go's GC after buffer is no longer referenced
 
 **Rust:**
-- `alloc` uses `std::alloc::alloc` with appropriate `Layout`
+- `otelwasm_memory_allocate` uses `std::alloc::alloc` with appropriate `Layout`
 - Guest SDK provides safe wrapper that deallocates in Drop implementation
 - No GC concerns; deallocation is deterministic
 
 **Zig:**
-- `alloc` uses `std.heap.wasm_allocator`
+- `otelwasm_memory_allocate` uses `std.heap.wasm_allocator`
 - Guest SDK manages allocation/deallocation via Zig's allocator interface
 - Manual memory management, explicit deallocation
 

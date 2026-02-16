@@ -12,7 +12,7 @@ For more details, see https://github.com/otelwasm/otelwasm/pull/27.
 - Required guest exports (for example `otelwasm_consume_traces`) are validated at module initialization.
 - Telemetry flows via host push:
   - host marshals data
-  - host calls guest `alloc`
+  - host calls guest `otelwasm_memory_allocate`
   - host writes payload into guest memory
   - host calls guest `consume_*`
 - Receiver ABI v1 entrypoints are `otelwasm_start_traces_receiver`, `otelwasm_start_metrics_receiver`, and `otelwasm_start_logs_receiver`.

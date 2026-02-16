@@ -9,7 +9,7 @@ This project is a PoC for a WebAssembly (Wasm) based OpenTelemetry Collector plu
 The current ABI v1 host/guest contract uses a push model for telemetry payloads:
 
 - Guest MUST export `abi_version_v1()` as the ABI marker.
-- Guest MUST export `alloc(size: i32) -> i32` so the host can allocate guest memory for incoming payloads.
+- Guest MUST export `otelwasm_memory_allocate(size: i32) -> i32` so the host can allocate guest memory for incoming payloads.
 - Host serializes telemetry and calls one of:
   - `otelwasm_consume_traces(data_ptr, data_size) -> status`
   - `otelwasm_consume_metrics(data_ptr, data_size) -> status`
