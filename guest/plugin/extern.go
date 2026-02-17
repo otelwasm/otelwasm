@@ -12,7 +12,7 @@ const (
 var supportedTelemetry TelemetryType = 0
 
 var (
-	_ func()                      = _abiVersionV1
+	_ func()                      = _otelwasmABIVersion010
 	_ func() uint32               = _getSupportedTelemetry
 	_ func() uint32               = _start
 	_ func() uint32               = _shutdown
@@ -24,8 +24,8 @@ var (
 	_ func()                      = _startLogsReceiver
 )
 
-//go:wasmexport abi_version_v1
-func _abiVersionV1() {}
+//go:wasmexport otelwasm_abi_version_0_1_0
+func _otelwasmABIVersion010() {}
 
 //go:wasmexport get_supported_telemetry
 func _getSupportedTelemetry() uint32 {

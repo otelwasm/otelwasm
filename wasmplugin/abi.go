@@ -2,7 +2,7 @@ package wasmplugin
 
 import "github.com/tetratelabs/wazero/api"
 
-const abiVersionV1MarkerExport = "abi_version_v1"
+const abiVersionV1MarkerExport = "otelwasm_abi_version_0_1_0"
 
 // ABIVersion represents the detected plugin ABI.
 type ABIVersion uint8

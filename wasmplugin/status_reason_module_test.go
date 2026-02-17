@@ -44,7 +44,7 @@ func buildStatusReasonConsumeTracesModule(reason string) []byte {
 		0x05, // 5 functions
 		0x01, // otelwasm_memory_allocate
 		0x02, // otelwasm_consume_traces
-		0x03, // abi_version_v1
+		0x03, // otelwasm_abi_version_0_1_0
 		0x04, // get_supported_telemetry
 		0x03, // _initialize
 	})

@@ -345,7 +345,7 @@ During the transition period, the host supports both ABIs:
 
 ```go
 func detectABI(mod api.Module) ABIVersion {
-    if _, ok := mod.ExportedFunction("abi_version_v1"); ok {
+    if _, ok := mod.ExportedFunction("otelwasm_abi_version_0_1_0"); ok {
         return ABIV1  // push model
     }
     // Fall back to experimental ABI (pull model)

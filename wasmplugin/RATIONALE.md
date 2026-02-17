@@ -8,7 +8,7 @@ For more details, see https://github.com/otelwasm/otelwasm/pull/27.
 
 `wasmplugin` now treats ABI v1 as a strict boundary for push-model components:
 
-- ABI v1 modules are validated by the `abi_version_v1` export marker.
+- ABI v1 modules are validated by the `otelwasm_abi_version_0_1_0` export marker.
 - Required guest exports (for example `otelwasm_consume_traces`) are validated at module initialization.
 - Telemetry flows via host push:
   - host marshals data

@@ -10,7 +10,7 @@ import (
 func TestABIV1BoundaryNegativeCases(t *testing.T) {
 	ctx := context.Background()
 
-	t.Run("rejects modules without abi_version_v1 export", func(t *testing.T) {
+	t.Run("rejects modules without otelwasm_abi_version_0_1_0 export", func(t *testing.T) {
 		modPath := writeTempModule(t, buildTestModule(true, []wasmFunctionSpec{
 			{name: "_initialize", typeIndex: wasmTypeFunc0To0},
 			{name: memoryAllocateFunction, typeIndex: wasmTypeFuncI32ToI32, returnValue: uint32Ptr(16)},

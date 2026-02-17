@@ -16,9 +16,14 @@ func TestDetectABIVersion(t *testing.T) {
 		nilMod  bool
 	}{
 		{
-			name:    "detects v1 marker",
-			exports: []string{"abi_version_v1"},
+			name:    "detects v1 marker with otelwasm ABI export name",
+			exports: []string{"otelwasm_abi_version_0_1_0"},
 			want:    ABIV1,
+		},
+		{
+			name:    "returns unknown for legacy v1 marker export name",
+			exports: []string{"abi_version_v1"},
+			want:    ABIUnknown,
 		},
 		{
 			name:    "returns unknown when marker is absent",
