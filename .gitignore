@@ -24,3 +24,4 @@ go.work.sum
 bin/
 otelcol-dev/
 ocb
+.tmp/

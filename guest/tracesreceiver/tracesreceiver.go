@@ -21,7 +21,7 @@ func SetPlugin(mp api.TracesReceiver) {
 
 var _ func() = _startTracesReceiver
 
-//go:wasmexport startTracesReceiver
+//go:wasmexport otelwasm_start_traces_receiver
 func _startTracesReceiver() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

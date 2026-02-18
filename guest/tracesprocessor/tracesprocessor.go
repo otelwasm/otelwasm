@@ -6,6 +6,7 @@ import (
 	"github.com/otelwasm/otelwasm/guest/api"
 	pubimports "github.com/otelwasm/otelwasm/guest/imports"
 	"github.com/otelwasm/otelwasm/guest/internal/imports"
+	"github.com/otelwasm/otelwasm/guest/internal/mem"
 	"github.com/otelwasm/otelwasm/guest/internal/plugin"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 )
@@ -20,17 +21,21 @@ func SetPlugin(tp api.TracesProcessor) {
 	plugin.MustSet(tp)
 }
 
-var _ func() uint32 = _processTraces
+var _ func(uint32, uint32) uint32 = _consumeTraces
 
-//go:wasmexport processTraces
-func _processTraces() uint32 {
-	traces := imports.CurrentTraces()
+//go:wasmexport otelwasm_consume_traces
+func _consumeTraces(dataPtr uint32, dataSize uint32) uint32 {
+	raw := mem.TakeOwnership(dataPtr, dataSize)
+	unmarshaler := ptrace.ProtoUnmarshaler{}
+	traces, err := unmarshaler.UnmarshalTraces(raw)
+	if err != nil {
+		return imports.StatusToCode(api.StatusError(err.Error()))
+	}
+
 	result, status := tracesprocessor.ProcessTraces(traces)
-	// If the result is not empty, set it in the host.
-	// In case of empty result, the result should be written inside the guest call.
 	if result != (ptrace.Traces{}) {
 		pubimports.SetResultTraces(result)
 	}
-	runtime.KeepAlive(result) // until ptr is no longer needed
+	runtime.KeepAlive(result) // until ptr is no longer needed.
 	return imports.StatusToCode(status)
 }

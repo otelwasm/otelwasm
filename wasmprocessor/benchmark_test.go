@@ -27,6 +27,56 @@ func generateExampleTraces() ptrace.Traces {
 	return td
 }
 
+func generatePushModelTraces(spanCount int) ptrace.Traces {
+	td := ptrace.NewTraces()
+	resourceSpans := td.ResourceSpans().AppendEmpty()
+	scopeSpans := resourceSpans.ScopeSpans().AppendEmpty()
+	for i := 0; i < spanCount; i++ {
+		span := scopeSpans.Spans().AppendEmpty()
+		span.SetName("push-model-span")
+		span.SetTraceID([16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16})
+		span.SetSpanID([8]byte{1, 2, 3, 4, 5, 6, 7, 8})
+	}
+	return td
+}
+
+func BenchmarkTracesProcessorPushModel(b *testing.B) {
+	factory := NewFactory()
+	cfg := factory.CreateDefaultConfig().(*Config)
+	cfg.Path = "testdata/attributesprocessor/main.wasm"
+	cfg.PluginConfig = wasmplugin.PluginConfig{
+		"actions": []map[string]string{
+			{
+				"key":    "bench_key",
+				"value":  "bench_value",
+				"action": "insert",
+			},
+		},
+	}
+
+	ctx := b.Context()
+	settings := processortest.NewNopSettings(typeStr)
+	tp, err := factory.CreateTraces(ctx, settings, cfg, consumertest.NewNop())
+	if err != nil {
+		b.Fatalf("failed to create traces processor: %v", err)
+	}
+	if err := tp.Start(ctx, componenttest.NewNopHost()); err != nil {
+		b.Fatalf("failed to start processor: %v", err)
+	}
+	b.Cleanup(func() {
+		_ = tp.Shutdown(ctx)
+	})
+
+	traces := generatePushModelTraces(100)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if err := tp.ConsumeTraces(ctx, traces); err != nil {
+			b.Fatal(err)
+		}
+	}
+	b.ReportAllocs()
+}
+
 func BenchmarkNopProcessorWasmInterpreter(b *testing.B) {
 	// Test that the processor can be created with the default config
 	factory := NewFactory()

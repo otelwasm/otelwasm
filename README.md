@@ -4,6 +4,25 @@ Project Status: **Experimental**
 
 This project is a PoC for a WebAssembly (Wasm) based OpenTelemetry Collector plugins. It is not intended for production use, and it may include breaking changes without notice.
 
+## ABI v1 Push Model (Guest Contract)
+
+The current ABI v1 host/guest contract uses a push model for telemetry payloads:
+
+- Guest MUST export `otelwasm_abi_version_0_1_0()` as the ABI marker.
+- Guest MUST export `otelwasm_memory_allocate(size: i32) -> i32` so the host can allocate guest memory for incoming payloads.
+- Host serializes telemetry and calls one of:
+  - `otelwasm_consume_traces(data_ptr, data_size) -> status`
+  - `otelwasm_consume_metrics(data_ptr, data_size) -> status`
+  - `otelwasm_consume_logs(data_ptr, data_size) -> status`
+- Receivers are started via:
+  - `otelwasm_start_traces_receiver()`
+  - `otelwasm_start_metrics_receiver()`
+  - `otelwasm_start_logs_receiver()`
+- Lifecycle functions remain `start() -> status` and `shutdown() -> status`.
+- On non-zero status returns, guests should call `set_status_reason(ptr, size)` so host-side errors include the guest-provided reason.
+
+If `otelwasm_abi_version_0_1_0` or required functions are missing, the host rejects module initialization.
+
 ## Build OTelWasm OTel Collector distribution
 
 If you want to build OTelWasm OTel Collector distribution, execute the following command.
