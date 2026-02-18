@@ -179,52 +179,51 @@ func BenchmarkAttributesProcessorWasmInterpreter(b *testing.B) {
 	}
 }
 
-// TODO(tsuzu): Investigate why this crashes on arm64 (related to #64)
-// func BenchmarkAttributesProcessorWasmCompiled(b *testing.B) {
-// 	// Test that the processor can be created with the default config
-// 	factory := NewFactory()
-// 	cfg := factory.CreateDefaultConfig().(*Config)
-// 	cfg.Path = "testdata/attributesprocessor/main.wasm"
-// 	cfg.PluginConfig = wasmplugin.PluginConfig{
-// 		"actions": []map[string]string{
-// 			{
-// 				"key":    "key",
-// 				"value":  "value",
-// 				"action": "insert",
-// 			},
-// 		},
-// 	}
-// 	cfg.RuntimeConfig.Mode = wasmplugin.RuntimeModeCompiled
-// 	ctx := b.Context()
+func BenchmarkAttributesProcessorWasmCompiled(b *testing.B) {
+	// Test that the processor can be created with the default config
+	factory := NewFactory()
+	cfg := factory.CreateDefaultConfig().(*Config)
+	cfg.Path = "testdata/attributesprocessor/main.wasm"
+	cfg.PluginConfig = wasmplugin.PluginConfig{
+		"actions": []map[string]string{
+			{
+				"key":    "key",
+				"value":  "value",
+				"action": "insert",
+			},
+		},
+	}
+	cfg.RuntimeConfig.Mode = wasmplugin.RuntimeModeCompiled
+	ctx := b.Context()
 
-// 	// Test for traces
-// 	settings := processortest.NewNopSettings(typeStr)
-// 	tp, err := factory.CreateTraces(ctx, settings, cfg, consumertest.NewNop())
-// 	if err != nil {
-// 		b.Fatalf("failed to create traces processor: %v", err)
-// 	}
-// 	if tp == nil {
-// 		b.Fatal("traces processor is nil")
-// 	}
+	// Test for traces
+	settings := processortest.NewNopSettings(typeStr)
+	tp, err := factory.CreateTraces(ctx, settings, cfg, consumertest.NewNop())
+	if err != nil {
+		b.Fatalf("failed to create traces processor: %v", err)
+	}
+	if tp == nil {
+		b.Fatal("traces processor is nil")
+	}
 
-// 	if err := tp.Start(ctx, componenttest.NewNopHost()); err != nil {
-// 		b.Errorf("failed to start processor: %v", err)
-// 	}
+	if err := tp.Start(ctx, componenttest.NewNopHost()); err != nil {
+		b.Errorf("failed to start processor: %v", err)
+	}
 
-// 	td := generateExampleTraces()
+	td := generateExampleTraces()
 
-// 	b.Run("process traces", func(b *testing.B) {
-// 		for i := 0; i < b.N; i++ {
-// 			if err := tp.ConsumeTraces(ctx, td); err != nil {
-// 				b.Errorf("failed to consume traces: %v", err)
-// 			}
-// 		}
-// 	})
+	b.Run("process traces", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			if err := tp.ConsumeTraces(ctx, td); err != nil {
+				b.Errorf("failed to consume traces: %v", err)
+			}
+		}
+	})
 
-// 	if err := tp.Shutdown(ctx); err != nil {
-// 		b.Errorf("failed to shutdown processor: %v", err)
-// 	}
-// }
+	if err := tp.Shutdown(ctx); err != nil {
+		b.Errorf("failed to shutdown processor: %v", err)
+	}
+}
 
 func BenchmarkAttributesProcessorGo(b *testing.B) {
 	// Test that the processor can be created with the default config
