@@ -27,17 +27,17 @@ var (
 //go:wasmexport otelwasm_abi_version_0_1_0
 func _otelwasmABIVersion010() {}
 
-//go:wasmexport get_supported_telemetry
+//go:wasmexport otelwasm_get_supported_telemetry
 func _getSupportedTelemetry() uint32 {
 	return uint32(supportedTelemetry)
 }
 
-//go:wasmexport start
+//go:wasmexport otelwasm_start
 func _start() uint32 {
 	return 0
 }
 
-//go:wasmexport shutdown
+//go:wasmexport otelwasm_shutdown
 func _shutdown() uint32 {
 	return 0
 }

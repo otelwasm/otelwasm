@@ -29,50 +29,37 @@ const (
 	otelWasm = "opentelemetry.io/wasm"
 
 	// Host function exports
-	setResultTraces      = "set_result_traces"
-	setResultMetrics     = "set_result_metrics"
-	setResultLogs        = "set_result_logs"
-	getPluginConfig      = "get_plugin_config"
-	setStatusReason      = "set_status_reason"
-	getShutdownRequested = "get_shutdown_requested"
-
-	// Legacy host export names used by pre-migration modules.
-	legacySetResultTraces       = "setResultTraces"
-	legacySetResultMetrics      = "setResultMetrics"
-	legacySetResultLogs         = "setResultLogs"
-	legacyGetPluginConfig       = "getPluginConfig"
-	legacySetResultStatusReason = "setResultStatusReason"
-	legacyGetShutdownRequested  = "getShutdownRequested"
+	setResultTraces      = "otelwasm_set_result_traces"
+	setResultMetrics     = "otelwasm_set_result_metrics"
+	setResultLogs        = "otelwasm_set_result_logs"
+	getPluginConfig      = "otelwasm_get_plugin_config"
+	setStatusReason      = "otelwasm_set_status_reason"
+	getShutdownRequested = "otelwasm_get_shutdown_requested"
 
 	// Guest function
-	getSupportedTelemetry       = "get_supported_telemetry"
-	legacyGetSupportedTelemetry = "getSupportedTelemetry"
-	memoryAllocateFunction      = "otelwasm_memory_allocate"
-	consumeTracesFunction       = "otelwasm_consume_traces"
-	consumeMetricsFunction      = "otelwasm_consume_metrics"
-	consumeLogsFunction         = "otelwasm_consume_logs"
+	getSupportedTelemetry  = "otelwasm_get_supported_telemetry"
+	memoryAllocateFunction = "otelwasm_memory_allocate"
+	consumeTracesFunction  = "otelwasm_consume_traces"
+	consumeMetricsFunction = "otelwasm_consume_metrics"
+	consumeLogsFunction    = "otelwasm_consume_logs"
 
 	// WASI extension name
 	wasmEdgeV2Extension = "wasmedgev2"
 )
 
 var builtInGuestFunctions = map[string][]string{
-	getSupportedTelemetry: {getSupportedTelemetry, legacyGetSupportedTelemetry},
+	getSupportedTelemetry: {getSupportedTelemetry},
 }
 
 var abiV1RequiredFunctions = map[string]struct{}{
 	"otelwasm_consume_traces":         {},
 	"otelwasm_consume_metrics":        {},
 	"otelwasm_consume_logs":           {},
-	"start":                           {},
-	"shutdown":                        {},
+	"otelwasm_start":                  {},
+	"otelwasm_shutdown":               {},
 	"otelwasm_start_traces_receiver":  {},
 	"otelwasm_start_metrics_receiver": {},
 	"otelwasm_start_logs_receiver":    {},
-	// Legacy naming still used by non-migrated call sites.
-	"startTracesReceiver":  {},
-	"startMetricsReceiver": {},
-	"startLogsReceiver":    {},
 }
 
 type telemetryType uint32
@@ -677,38 +664,20 @@ func instantiateHostModule(ctx context.Context, runtime wazero.Runtime) (api.Mod
 		WithGoModuleFunction(api.GoModuleFunc(setResultTracesFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{}).
 		WithParameterNames("buf", "buf_len").Export(setResultTraces).
 		NewFunctionBuilder().
-		WithGoModuleFunction(api.GoModuleFunc(setResultTracesFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{}).
-		WithParameterNames("buf", "buf_len").Export(legacySetResultTraces).
-		NewFunctionBuilder().
 		WithGoModuleFunction(api.GoModuleFunc(setResultMetricsFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{}).
 		WithParameterNames("buf", "buf_len").Export(setResultMetrics).
-		NewFunctionBuilder().
-		WithGoModuleFunction(api.GoModuleFunc(setResultMetricsFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{}).
-		WithParameterNames("buf", "buf_len").Export(legacySetResultMetrics).
 		NewFunctionBuilder().
 		WithGoModuleFunction(api.GoModuleFunc(setResultLogsFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{}).
 		WithParameterNames("buf", "buf_len").Export(setResultLogs).
 		NewFunctionBuilder().
-		WithGoModuleFunction(api.GoModuleFunc(setResultLogsFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{}).
-		WithParameterNames("buf", "buf_len").Export(legacySetResultLogs).
-		NewFunctionBuilder().
 		WithGoModuleFunction(api.GoModuleFunc(getPluginConfigFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{api.ValueTypeI32}).
 		WithParameterNames("buf", "buf_limit").Export(getPluginConfig).
-		NewFunctionBuilder().
-		WithGoModuleFunction(api.GoModuleFunc(getPluginConfigFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{api.ValueTypeI32}).
-		WithParameterNames("buf", "buf_limit").Export(legacyGetPluginConfig).
 		NewFunctionBuilder().
 		WithGoModuleFunction(api.GoModuleFunc(setStatusReasonFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{}).
 		WithParameterNames("buf", "buf_len").Export(setStatusReason).
 		NewFunctionBuilder().
-		WithGoModuleFunction(api.GoModuleFunc(setStatusReasonFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{}).
-		WithParameterNames("buf", "buf_len").Export(legacySetResultStatusReason).
-		NewFunctionBuilder().
 		WithGoModuleFunction(api.GoModuleFunc(getShutdownRequestedFn), []api.ValueType{}, []api.ValueType{api.ValueTypeI32}).
 		Export(getShutdownRequested).
-		NewFunctionBuilder().
-		WithGoModuleFunction(api.GoModuleFunc(getShutdownRequestedFn), []api.ValueType{}, []api.ValueType{api.ValueTypeI32}).
-		Export(legacyGetShutdownRequested).
 		Instantiate(ctx)
 }
 

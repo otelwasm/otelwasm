@@ -17,8 +17,8 @@ const (
 	consumeTracesFunctionName  = "otelwasm_consume_traces"
 	consumeMetricsFunctionName = "otelwasm_consume_metrics"
 	consumeLogsFunctionName    = "otelwasm_consume_logs"
-	startFunctionName          = "start"
-	shutdownFunctionName       = "shutdown"
+	startFunctionName          = "otelwasm_start"
+	shutdownFunctionName       = "otelwasm_shutdown"
 )
 
 type wasmProcessor struct {

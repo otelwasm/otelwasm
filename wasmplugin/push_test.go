@@ -103,17 +103,17 @@ func TestRequiresABIV1(t *testing.T) {
 	if !requiresABIV1([]string{consumeTracesFunction}) {
 		t.Fatal("otelwasm_consume_traces should require ABI v1")
 	}
-	if !requiresABIV1([]string{"start", "shutdown"}) {
-		t.Fatal("start/shutdown should require ABI v1")
+	if !requiresABIV1([]string{"otelwasm_start", "otelwasm_shutdown"}) {
+		t.Fatal("otelwasm_start/otelwasm_shutdown should require ABI v1")
 	}
-	if !requiresABIV1([]string{"startTracesReceiver"}) {
-		t.Fatal("startTracesReceiver should require ABI v1")
+	if !requiresABIV1([]string{"otelwasm_start_traces_receiver"}) {
+		t.Fatal("otelwasm_start_traces_receiver should require ABI v1")
 	}
-	if !requiresABIV1([]string{"startMetricsReceiver"}) {
-		t.Fatal("startMetricsReceiver should require ABI v1")
+	if !requiresABIV1([]string{"otelwasm_start_metrics_receiver"}) {
+		t.Fatal("otelwasm_start_metrics_receiver should require ABI v1")
 	}
-	if !requiresABIV1([]string{"startLogsReceiver"}) {
-		t.Fatal("startLogsReceiver should require ABI v1")
+	if !requiresABIV1([]string{"otelwasm_start_logs_receiver"}) {
+		t.Fatal("otelwasm_start_logs_receiver should require ABI v1")
 	}
 	if requiresABIV1([]string{"processTraces"}) {
 		t.Fatal("legacy function should not require ABI v1")

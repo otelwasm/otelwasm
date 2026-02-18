@@ -16,11 +16,11 @@ func buildStatusReasonConsumeTracesModule(reason string) []byte {
 	}
 
 	// Type section:
-	// 0: (i32, i32) -> ()      [set_status_reason import]
+	// 0: (i32, i32) -> ()      [otelwasm_set_status_reason import]
 	// 1: (i32) -> i32          [otelwasm_memory_allocate]
 	// 2: (i32, i32) -> i32     [otelwasm_consume_traces]
 	// 3: () -> ()              [abi marker / _initialize]
-	// 4: () -> i32             [get_supported_telemetry]
+	// 4: () -> i32             [otelwasm_get_supported_telemetry]
 	appendSection(0x01, []byte{
 		0x05, // 5 types
 		0x60, 0x02, 0x7f, 0x7f, 0x00,
@@ -30,7 +30,7 @@ func buildStatusReasonConsumeTracesModule(reason string) []byte {
 		0x60, 0x00, 0x01, 0x7f,
 	})
 
-	// Import section: import opentelemetry.io/wasm.set_status_reason as function index 0.
+	// Import section: import opentelemetry.io/wasm.otelwasm_set_status_reason as function index 0.
 	importPayload := []byte{0x01}
 	importPayload = append(importPayload, encodeULEB128Test(uint32(len(otelWasm)))...)
 	importPayload = append(importPayload, otelWasm...)
@@ -45,7 +45,7 @@ func buildStatusReasonConsumeTracesModule(reason string) []byte {
 		0x01, // otelwasm_memory_allocate
 		0x02, // otelwasm_consume_traces
 		0x03, // otelwasm_abi_version_0_1_0
-		0x04, // get_supported_telemetry
+		0x04, // otelwasm_get_supported_telemetry
 		0x03, // _initialize
 	})
 
@@ -76,13 +76,13 @@ func buildStatusReasonConsumeTracesModule(reason string) []byte {
 	allocBody = append(allocBody, 0x0b)
 
 	// otelwasm_consume_traces(data_ptr, data_size):
-	//   call set_status_reason(reason_offset=32, reason_len=len(reason))
+	//   call otelwasm_set_status_reason(reason_offset=32, reason_len=len(reason))
 	//   return ERROR(1)
 	consumeBody := []byte{
 		0x00,       // local decl count
 		0x41, 0x20, // i32.const 32
 		0x41, byte(len(reason)), // i32.const reason_len (len(reason) < 128 in tests)
-		0x10, 0x00, // call function index 0 (imported set_status_reason)
+		0x10, 0x00, // call function index 0 (imported otelwasm_set_status_reason)
 		0x41, 0x01, // i32.const 1 (ERROR)
 		0x0b, // end
 	}

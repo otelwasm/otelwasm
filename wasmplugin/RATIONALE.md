@@ -17,4 +17,4 @@ For more details, see https://github.com/otelwasm/otelwasm/pull/27.
   - host calls guest `consume_*`
 - Receiver ABI v1 entrypoints are `otelwasm_start_traces_receiver`, `otelwasm_start_metrics_receiver`, and `otelwasm_start_logs_receiver`.
 
-For error reporting, non-zero `consume_*` status codes are surfaced with status strings (`ERROR`, etc.) and include guest-provided reason text set through `set_status_reason` when available.
+For error reporting, non-zero `consume_*` status codes are surfaced with status strings (`ERROR`, etc.) and include guest-provided reason text set through `otelwasm_set_status_reason` when available.
