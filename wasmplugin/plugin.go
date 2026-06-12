@@ -498,6 +498,24 @@ func instantiateHostModule(ctx context.Context, runtime wazero.Runtime) (api.Mod
 		WithGoModuleFunction(api.GoModuleFunc(pdataCommitCurrentTracesFn), []api.ValueType{}, []api.ValueType{}).
 		Export(pdataCommitCurrentTraces).
 		NewFunctionBuilder().
+		WithGoModuleFunction(api.GoModuleFunc(pdataCurrentMetricsFn), []api.ValueType{}, []api.ValueType{api.ValueTypeI32}).
+		Export(pdataCurrentMetrics).
+		NewFunctionBuilder().
+		WithGoModuleFunction(api.GoModuleFunc(pdataCommitCurrentMetricsFn), []api.ValueType{}, []api.ValueType{}).
+		Export(pdataCommitCurrentMetrics).
+		NewFunctionBuilder().
+		WithGoModuleFunction(api.GoModuleFunc(pdataCurrentLogsFn), []api.ValueType{}, []api.ValueType{api.ValueTypeI32}).
+		Export(pdataCurrentLogs).
+		NewFunctionBuilder().
+		WithGoModuleFunction(api.GoModuleFunc(pdataCommitCurrentLogsFn), []api.ValueType{}, []api.ValueType{}).
+		Export(pdataCommitCurrentLogs).
+		NewFunctionBuilder().
+		WithGoModuleFunction(api.GoModuleFunc(pdataGetF64Fn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{api.ValueTypeF64}).
+		WithParameterNames("handle", "field").Export(pdataGetF64).
+		NewFunctionBuilder().
+		WithGoModuleFunction(api.GoModuleFunc(pdataSetF64Fn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32, api.ValueTypeF64}, []api.ValueType{}).
+		WithParameterNames("handle", "field", "value").Export(pdataSetF64).
+		NewFunctionBuilder().
 		WithGoModuleFunction(api.GoModuleFunc(pdataGetI64Fn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{api.ValueTypeI64}).
 		WithParameterNames("handle", "field").Export(pdataGetI64).
 		NewFunctionBuilder().

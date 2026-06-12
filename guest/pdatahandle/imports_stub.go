@@ -10,9 +10,21 @@ func pdataCurrentTraces() uint32 { return 0 }
 
 func pdataCommitCurrentTraces() {}
 
+func pdataCurrentMetrics() uint32 { return 0 }
+
+func pdataCommitCurrentMetrics() {}
+
+func pdataCurrentLogs() uint32 { return 0 }
+
+func pdataCommitCurrentLogs() {}
+
 func pdataGetI64(handle, field uint32) int64 { return 0 }
 
 func pdataSetI64(handle, field uint32, value int64) {}
+
+func pdataGetF64(handle, field uint32) float64 { return 0 }
+
+func pdataSetF64(handle, field uint32, value float64) {}
 
 func pdataGetStr(handle, field, buf uint32, bufLimit mem.BufLimit) (len uint32) { return }
 

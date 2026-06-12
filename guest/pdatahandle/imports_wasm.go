@@ -10,11 +10,29 @@ func pdataCurrentTraces() uint32
 //go:wasmimport opentelemetry.io/wasm pdataCommitCurrentTraces
 func pdataCommitCurrentTraces()
 
+//go:wasmimport opentelemetry.io/wasm pdataCurrentMetrics
+func pdataCurrentMetrics() uint32
+
+//go:wasmimport opentelemetry.io/wasm pdataCommitCurrentMetrics
+func pdataCommitCurrentMetrics()
+
+//go:wasmimport opentelemetry.io/wasm pdataCurrentLogs
+func pdataCurrentLogs() uint32
+
+//go:wasmimport opentelemetry.io/wasm pdataCommitCurrentLogs
+func pdataCommitCurrentLogs()
+
 //go:wasmimport opentelemetry.io/wasm pdataGetI64
 func pdataGetI64(handle, field uint32) int64
 
 //go:wasmimport opentelemetry.io/wasm pdataSetI64
 func pdataSetI64(handle, field uint32, value int64)
+
+//go:wasmimport opentelemetry.io/wasm pdataGetF64
+func pdataGetF64(handle, field uint32) float64
+
+//go:wasmimport opentelemetry.io/wasm pdataSetF64
+func pdataSetF64(handle, field uint32, value float64)
 
 //go:wasmimport opentelemetry.io/wasm pdataGetStr
 func pdataGetStr(handle, field, buf uint32, bufLimit mem.BufLimit) (len uint32)
