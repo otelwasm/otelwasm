@@ -118,6 +118,10 @@ type Stack struct {
 
 	// PluginConfigJSON is the plugin config in JSON representation passed to the guest
 	PluginConfigJSON []byte
+
+	// handles is the per-call table backing the handle-based pdata ABI.
+	// Entries are valid only for the duration of a single guest call.
+	handles []any
 }
 
 // paramsFromContext retrieves the Stack from the context
@@ -487,6 +491,42 @@ func instantiateHostModule(ctx context.Context, runtime wazero.Runtime) (api.Mod
 		NewFunctionBuilder().
 		WithGoModuleFunction(api.GoModuleFunc(getShutdownRequestedFn), []api.ValueType{}, []api.ValueType{api.ValueTypeI32}).
 		Export(getShutdownRequested).
+		NewFunctionBuilder().
+		WithGoModuleFunction(api.GoModuleFunc(pdataCurrentTracesFn), []api.ValueType{}, []api.ValueType{api.ValueTypeI32}).
+		Export(pdataCurrentTraces).
+		NewFunctionBuilder().
+		WithGoModuleFunction(api.GoModuleFunc(pdataCommitCurrentTracesFn), []api.ValueType{}, []api.ValueType{}).
+		Export(pdataCommitCurrentTraces).
+		NewFunctionBuilder().
+		WithGoModuleFunction(api.GoModuleFunc(pdataGetI64Fn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{api.ValueTypeI64}).
+		WithParameterNames("handle", "field").Export(pdataGetI64).
+		NewFunctionBuilder().
+		WithGoModuleFunction(api.GoModuleFunc(pdataSetI64Fn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32, api.ValueTypeI64}, []api.ValueType{}).
+		WithParameterNames("handle", "field", "value").Export(pdataSetI64).
+		NewFunctionBuilder().
+		WithGoModuleFunction(api.GoModuleFunc(pdataGetStrFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32, api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{api.ValueTypeI32}).
+		WithParameterNames("handle", "field", "buf", "buf_limit").Export(pdataGetStr).
+		NewFunctionBuilder().
+		WithGoModuleFunction(api.GoModuleFunc(pdataSetStrFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32, api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{}).
+		WithParameterNames("handle", "field", "ptr", "len").Export(pdataSetStr).
+		NewFunctionBuilder().
+		WithGoModuleFunction(api.GoModuleFunc(pdataGetMsgFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{api.ValueTypeI32}).
+		WithParameterNames("handle", "field").Export(pdataGetMsg).
+		NewFunctionBuilder().
+		WithGoModuleFunction(api.GoModuleFunc(pdataSliceLenFn), []api.ValueType{api.ValueTypeI32}, []api.ValueType{api.ValueTypeI32}).
+		WithParameterNames("handle").Export(pdataSliceLen).
+		NewFunctionBuilder().
+		WithGoModuleFunction(api.GoModuleFunc(pdataSliceGetFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{api.ValueTypeI32}).
+		WithParameterNames("handle", "index").Export(pdataSliceGet).
+		NewFunctionBuilder().
+		WithGoModuleFunction(api.GoModuleFunc(pdataMapLenFn), []api.ValueType{api.ValueTypeI32}, []api.ValueType{api.ValueTypeI32}).
+		WithParameterNames("handle").Export(pdataMapLen).
+		NewFunctionBuilder().
+		WithGoModuleFunction(api.GoModuleFunc(pdataMapGetStrFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32, api.ValueTypeI32, api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{api.ValueTypeI32}).
+		WithParameterNames("handle", "key_ptr", "key_len", "buf", "buf_limit").Export(pdataMapGetStr).
+		NewFunctionBuilder().
+		WithGoModuleFunction(api.GoModuleFunc(pdataMapPutStrFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32, api.ValueTypeI32, api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{}).
+		WithParameterNames("handle", "key_ptr", "key_len", "val_ptr", "val_len").Export(pdataMapPutStr).
 		Instantiate(ctx)
 }
 

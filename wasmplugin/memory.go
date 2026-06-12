@@ -10,15 +10,18 @@ import (
 // These utility functions are derived from the kube-scheduler-wasm-extension.
 // https://github.com/kubernetes-sigs/kube-scheduler-wasm-extension
 
-// writeBytesIfUnderLimit writes bytes to memory if they fit within the limit
+// writeBytesIfUnderLimit writes bytes to memory if they fit within the limit.
+// It returns the size of the bytes regardless, so that the guest can grow its
+// buffer and retry when the value didn't fit (see guest/internal/mem.GetBytes).
 func writeBytesIfUnderLimit(memory api.Memory, bytes []byte, buf, bufLimit uint32) uint32 {
-	if uint32(len(bytes)) > bufLimit {
-		return 0
+	size := uint32(len(bytes))
+	if size == 0 || size > bufLimit {
+		return size
 	}
 	if !memory.Write(buf, bytes) {
 		return 0
 	}
-	return uint32(len(bytes))
+	return size
 }
 
 // marshalTraceIfUnderLimit marshals traces to memory if they fit within the limit
