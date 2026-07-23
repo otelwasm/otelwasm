@@ -74,6 +74,25 @@ After saving the config as `config.yaml`, you can try otelwasmcol by the followi
 ./bin/otelwasmcol_darwin_arm64 --config ./config.yaml
 ```
 
+## Loading plugins from an OCI registry
+
+Wasm plugins can be distributed as OCI images. Set an `oci://` reference as the plugin path and the collector pulls the module at startup, using credentials from your local docker config (`docker login`):
+
+```yaml
+processors:
+  wasm/attributes:
+    path: "oci://ghcr.io/otelwasm/attributesprocessor:latest"
+```
+
+To publish a plugin, build the `wasmpush` CLI and push a compiled wasm module:
+
+```shell
+make wasmpush
+./bin/wasmpush -metadata metadata.json examples/processor/attributesprocessor/main.wasm ghcr.io/otelwasm/attributesprocessor:latest
+```
+
+By default the plugin is pushed as an OCI artifact with otelwasm media types (`application/vnd.otelwasm.plugin.content.layer.v1+wasm` and `application/vnd.otelwasm.plugin.metadata.v1+json`). For registries that don't support OCI artifacts, pass `-format compat` to push a standard container image whose single tar.gz layer contains `plugin.wasm` (compatible with [solo-io's wasm image spec](https://github.com/solo-io/wasm/blob/master/spec/spec-compat.md)). Pulling handles both formats transparently.
+
 ## Acknowledgements
 
 This project originally started by Anuraag (Rag) Agrawal (@anuraaga). Most of the code and design is based on [his prior work](https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/11772).

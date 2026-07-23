@@ -49,3 +49,10 @@ func TestReadWasmModuleRejectsFileURLPath(t *testing.T) {
 		t.Fatalf("expected unsupported scheme error, got %v", err)
 	}
 }
+
+func TestReadWasmModuleRejectsInvalidOCIReference(t *testing.T) {
+	_, err := readWasmModule(t.Context(), "oci://not a valid ref")
+	if err == nil {
+		t.Fatal("expected invalid OCI reference to fail")
+	}
+}

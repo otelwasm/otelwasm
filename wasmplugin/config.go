@@ -56,7 +56,8 @@ var DefaultRuntimeConfig = RuntimeConfig{
 // Config defines the common configuration for WASM components
 type Config struct {
 	// Path to the WASM module. Local files use a path without a scheme.
-	// Supported URL schemes are http and https.
+	// Supported URL schemes are http and https. OCI images use an oci://
+	// reference, e.g. "oci://ghcr.io/otelwasm/nopprocessor:latest".
 	Path string `mapstructure:"path"`
 
 	// PluginConfig is the configuration to be passed to the WASM module

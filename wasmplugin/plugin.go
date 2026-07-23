@@ -9,8 +9,10 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 	"sync/atomic"
 
+	"github.com/otelwasm/otelwasm/wasmplugin/oci"
 	"github.com/stealthrocket/wasi-go"
 	wasigo "github.com/stealthrocket/wasi-go/imports"
 	"github.com/stealthrocket/wasi-go/imports/wasi_snapshot_preview1"
@@ -214,6 +216,10 @@ func NewWasmPlugin(ctx context.Context, cfg *Config, requiredFunctions []string)
 }
 
 func readWasmModule(ctx context.Context, path string) ([]byte, error) {
+	if ref, ok := strings.CutPrefix(path, "oci://"); ok {
+		return oci.Pull(ctx, ref)
+	}
+
 	u, err := url.Parse(path)
 	if err != nil {
 		return nil, err
