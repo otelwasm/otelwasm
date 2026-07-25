@@ -1,0 +1,36 @@
+# Collector configuration distributed to otelwasmcol via OpAMP.
+#
+# The entire pipeline is composed of WASM plugins:
+#   OTLP receiver (WASM) -> add_new_attribute processor (WASM) -> stdout exporter (WASM)
+#
+# ${env:OTELWASM_ROOT} must be set in the environment of the OpAMP Supervisor
+# (and thus the collector) to the root of this repository.
+#
+# Edit this file while the demo is running: the OpAMP server pushes the new
+# config to the collector, which restarts with the new configuration.
+
+receivers:
+  wasm:
+    path: ${env:OTELWASM_ROOT}/examples/receiver/otlpreceiver/main.wasm
+    plugin_config:
+      protocols:
+        http:
+          endpoint: 127.0.0.1:4318
+
+processors:
+  wasm:
+    path: ${env:OTELWASM_ROOT}/examples/processor/add_new_attribute/main.wasm
+    plugin_config:
+      attribute_name: opamp.managed
+      attribute_value: "hello-from-opamp"
+
+exporters:
+  wasm:
+    path: ${env:OTELWASM_ROOT}/examples/exporter/stdout/main.wasm
+
+service:
+  pipelines:
+    traces:
+      receivers: [wasm]
+      processors: [wasm]
+      exporters: [wasm]

@@ -1,0 +1,33 @@
+# Configuration for the OpAMP Supervisor
+# (github.com/open-telemetry/opentelemetry-collector-contrib/cmd/opampsupervisor)
+# that manages otelwasmcol.
+#
+# Run from this directory:
+#   ../../bin/opampsupervisor --config supervisor.yaml
+
+server:
+  endpoint: ws://127.0.0.1:4320/v1/opamp
+  tls:
+    insecure: true
+
+capabilities:
+  accepts_remote_config: true
+  reports_remote_config: true
+  reports_effective_config: true
+  reports_health: true
+
+agent:
+  # Adjust for your platform (output of `make otelwasmcol`).
+  executable: ../../bin/otelwasmcol_darwin_arm64
+  config_apply_timeout: 30s
+  bootstrap_timeout: 15s
+  # Forward the collector's stdout/stderr (including the WASM stdout
+  # exporter's output) to the supervisor's own output.
+  passthrough_logs: true
+
+storage:
+  directory: ./storage
+
+telemetry:
+  logs:
+    level: info
