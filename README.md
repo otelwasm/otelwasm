@@ -93,6 +93,51 @@ make wasmpush
 
 By default the plugin is pushed as an OCI artifact with otelwasm media types (`application/vnd.otelwasm.plugin.content.layer.v1+wasm` and `application/vnd.otelwasm.plugin.metadata.v1+json`). For registries that don't support OCI artifacts, pass `-format compat` to push a standard container image whose single tar.gz layer contains `plugin.wasm` (compatible with [solo-io's wasm image spec](https://github.com/solo-io/wasm/blob/master/spec/spec-compat.md)). Pulling handles both formats transparently.
 
+### Local registry end-to-end test
+
+Start a local registry, build the binaries, and push the example receiver and exporter:
+
+```shell
+docker run --rm -d --name otelwasm-registry -p 127.0.0.1:5000:5000 registry:2
+make build-wasm-examples wasmpush otelwasmcol
+./bin/wasmpush examples/receiver/otlpreceiver/main.wasm localhost:5000/otelwasm/otlpreceiver:e2e
+./bin/wasmpush examples/exporter/stdout/main.wasm localhost:5000/otelwasm/stdoutexporter:e2e
+```
+
+Save the following Collector manifest as `config-oci.yaml`:
+
+```yaml
+receivers:
+  wasm/otlp:
+    path: "oci://localhost:5000/otelwasm/otlpreceiver:e2e"
+
+exporters:
+  wasm/stdout:
+    path: "oci://localhost:5000/otelwasm/stdoutexporter:e2e"
+
+service:
+  pipelines:
+    traces:
+      receivers: [wasm/otlp]
+      exporters: [wasm/stdout]
+```
+
+Start the Collector:
+
+```shell
+./bin/otelwasmcol_$(go env GOOS)_$(go env GOARCH) --config ./config-oci.yaml
+```
+
+In another terminal, send a trace over OTLP/HTTP:
+
+```shell
+curl --fail --header 'Content-Type: application/json' \
+  --data-binary '{"resourceSpans":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"oci-e2e"}}]},"scopeSpans":[{"scope":{"name":"otelwasm-e2e"},"spans":[{"traceId":"5b8efff798038103d269b633813fc60c","spanId":"eee19b7ec3c1b174","name":"oci-plugin-roundtrip","kind":1,"startTimeUnixNano":"1750000000000000000","endTimeUnixNano":"1750000001000000000","status":{"code":1}}]}]}]}' \
+  http://localhost:4318/v1/traces
+```
+
+The request should return HTTP 200 and the Collector should print the `oci-plugin-roundtrip` span. Stop the Collector, then remove the registry with `docker stop otelwasm-registry`.
+
 ## Acknowledgements
 
 This project originally started by Anuraag (Rag) Agrawal (@anuraaga). Most of the code and design is based on [his prior work](https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/11772).
