@@ -52,14 +52,16 @@ Observations:
 Identical guest workload in two ABI variants: walk every log record and
 upsert one string attribute per record.
 
+- **native** — the same walk + upsert as a plain Go processor through the same processorhelper harness (`BenchmarkHandleVsProtoLogsNative`)
 - `logs_add_attribute_proto` — proto ABI: the whole batch is serialized to the guest and the result serialized back
 - `logs_add_attribute_handle` — handle ABI (PR #90): the guest reads/mutates host-held pdata through fine-grained host functions (no bulk serialization)
-- Benchmark: `BenchmarkHandleVsProtoLogs` (wazero), `BenchmarkHandleVsProtoLogsWasmEdge` (WasmEdge), medians of 3 runs
+- Benchmark: `BenchmarkHandleVsProtoLogs` (wazero), `BenchmarkHandleVsProtoLogsWasmEdge` (WasmEdge), medians of 3 runs (native: 5 runs)
 
 ### time per batch
 
 | Configuration | ABI | 1 record | 100 records | 1000 records |
 |---|---|---:|---:|---:|
+| **native Go** | — | **90 ns** | **2.17 µs** | **21.3 µs** |
 | wazero interpreter | proto | 430 µs | 27.0 ms | 294.7 ms |
 | wazero interpreter | handle | 6.6 µs | 185 µs | 1.82 ms |
 | wazero compiled | proto | 17.0 µs | 769 µs | 8.23 ms |
@@ -68,6 +70,15 @@ upsert one string attribute per record.
 | WasmEdge interpreter | handle | 15.2 µs | 441 µs | 4.32 ms |
 | WasmEdge AOT | proto | 9.6 µs | 419 µs | 4.13 ms |
 | WasmEdge AOT | handle | 11.2 µs | 270 µs | 2.66 ms |
+
+### slowdown vs native (100 records)
+
+| Configuration | proto | handle |
+|---|---:|---:|
+| wazero interpreter | 12,400x | 85x |
+| wazero compiled | 354x | **13x** |
+| WasmEdge interpreter | 21,900x | 203x |
+| WasmEdge AOT | 193x | 124x |
 
 ### handle ABI speedup over proto ABI (100 records)
 
@@ -82,6 +93,7 @@ upsert one string attribute per record.
 
 | Configuration | ABI | B/op | allocs/op |
 |---|---|---:|---:|
+| native Go | — | 1.7 KB | 104 |
 | wazero interpreter | proto | 1.43 MB | 33,982 |
 | wazero interpreter | handle | 40.5 KB | 1,459 |
 | wazero compiled | proto | 163 KB | 2,431 |
@@ -93,7 +105,8 @@ upsert one string attribute per record.
 
 Observations:
 
-- **wazero compiled + handle ABI is the fastest configuration overall** (29 µs / 100 records), ~9x faster than WasmEdge AOT with the handle ABI and ~14x faster than the best proto configuration.
+- **wazero compiled + handle ABI is the fastest wasm configuration** (29 µs / 100 records), ~9x faster than WasmEdge AOT with the handle ABI and ~14x faster than the best proto configuration — and only **13x slower than native** (proto's best is 193x).
+- The native baseline is extremely cheap here (a map upsert per record), so the wasm slowdown factors are an upper bound; heavier per-record logic would shrink the relative gap.
 - **The handle ABI's benefit is strongly runtime-dependent.** On wazero, a host function call is a plain Go call, so the many fine-grained `pdata*` calls are nearly free (145x speedup on the interpreter). On WasmEdge every host call crosses the CGO boundary with per-call boxing in the bindings (43k allocs/op at 1000 records vs 5k on wazero), which caps the gain at 1.6x — and at 1 record the handle ABI is even slightly slower than proto (11.2 µs vs 9.6 µs).
 - Consequently the optimal runtime flips with the ABI: **proto ABI → WasmEdge AOT; handle ABI → wazero compiled.**
 - The WasmEdge handle numbers include some overhead from the wazero-convention adapter (`adaptWazeroHostFn`), but the dominant cost is the CGO round-trip per host call in the wasmedge-go bindings.
@@ -114,7 +127,7 @@ WasmEdge AOT compilation can run at startup (`runtime: {name: wasmedge, mode: co
 
 - The wazero compiler backend crash with the attributesprocessor guest on arm64 ([#64](https://github.com/otelwasm/otelwasm/issues/64)) no longer reproduces on wazero >= v1.11; these runs used v1.12.0.
 - During this work a host-side protocol bug was found and fixed: payloads larger than the guest's initial 2048-byte read buffer were returned as size 0 instead of the required size, so any batch over ~2 KB crashed the guest (`writeBytesIfUnderLimit`). All benchmarks above include the fix.
-- Native Go in Workload 1 is not directly comparable to Workload 2 (different processing pipelines).
+- Native Go in Workload 1 is not directly comparable to Workload 2 (different processing pipelines); Workload 2 has its own native baseline running the identical walk + upsert.
 
 ## Reproduction
 
@@ -131,5 +144,5 @@ $ export CGO_CFLAGS="-I$HOME/.wasmedge/include"
 $ export CGO_LDFLAGS="-L$HOME/.wasmedge/lib -lwasmedge -Wl,-rpath,$HOME/.wasmedge/lib"
 $ cd wasmprocessor
 $ go test -tags wasmedge -run '^$' -bench 'BenchmarkLogsAttributesProcessor' -benchmem -count=5 .
-$ go test -tags wasmedge -run '^$' -bench 'BenchmarkHandleVsProtoLogs' -benchmem -count=3 .
+$ go test -tags wasmedge -run '^$' -bench 'BenchmarkHandleVsProtoLogs' -benchmem -count=3 .   # includes the native baseline
 ```
