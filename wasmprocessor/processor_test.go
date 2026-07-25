@@ -1,6 +1,7 @@
 package wasmprocessor
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/otelwasm/otelwasm/wasmplugin"
@@ -11,6 +12,49 @@ import (
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	"go.opentelemetry.io/collector/processor/processortest"
 )
+
+// TestProcessTracesLargePayload verifies payloads larger than the guest's
+// initial 2048-byte read buffer round-trip correctly. The host must return
+// the required size when the payload exceeds the guest buffer so that the
+// guest can grow it and retry (regression test).
+func TestProcessTracesLargePayload(t *testing.T) {
+	factory := NewFactory()
+	cfg := factory.CreateDefaultConfig().(*Config)
+	cfg.Path = "testdata/nop/main.wasm"
+	ctx := t.Context()
+
+	sink := new(consumertest.TracesSink)
+	settings := processortest.NewNopSettings(typeStr)
+	tp, err := factory.CreateTraces(ctx, settings, cfg, sink)
+	if err != nil {
+		t.Fatalf("failed to create traces processor: %v", err)
+	}
+
+	const spanCount = 200
+	traces := ptrace.NewTraces()
+	spans := traces.ResourceSpans().AppendEmpty().ScopeSpans().AppendEmpty().Spans()
+	for i := 0; i < spanCount; i++ {
+		span := spans.AppendEmpty()
+		span.SetName(fmt.Sprintf("span-with-a-reasonably-long-name-%04d", i))
+		span.Attributes().PutStr("http.user_agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36")
+	}
+
+	if err := tp.ConsumeTraces(ctx, traces); err != nil {
+		t.Fatalf("failed to consume traces: %v", err)
+	}
+
+	got := sink.AllTraces()
+	if len(got) != 1 {
+		t.Fatalf("expected 1 traces batch, got %d", len(got))
+	}
+	if got[0].SpanCount() != spanCount {
+		t.Errorf("expected %d spans, got %d", spanCount, got[0].SpanCount())
+	}
+
+	if err := tp.Shutdown(ctx); err != nil {
+		t.Errorf("failed to shutdown processor: %v", err)
+	}
+}
 
 func TestCreateDefaultConfig(t *testing.T) {
 	// Test that the default config can be created and cast to the correct type
