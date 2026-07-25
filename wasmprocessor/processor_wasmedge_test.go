@@ -3,6 +3,7 @@
 package wasmprocessor
 
 import (
+	"os"
 	"testing"
 
 	"github.com/otelwasm/otelwasm/wasmplugin"
@@ -55,6 +56,42 @@ func TestWasmEdgeProcessTraces(t *testing.T) {
 	gotSpan := got[0].ResourceSpans().At(0).ScopeSpans().At(0).Spans().At(0)
 	if gotSpan.Name() != "test-span" {
 		t.Errorf("expected span name %q, got %q", "test-span", gotSpan.Name())
+	}
+
+	if err := tp.Shutdown(ctx); err != nil {
+		t.Errorf("failed to shutdown processor: %v", err)
+	}
+}
+
+// TestWasmEdgeAOTCompiledMode exercises runtime.mode "compiled", which
+// AOT-compiles the guest at startup. AOT compilation takes minutes for the
+// Go-based guests, so this test only runs when OTELWASM_TEST_AOT is set.
+func TestWasmEdgeAOTCompiledMode(t *testing.T) {
+	if os.Getenv("OTELWASM_TEST_AOT") == "" {
+		t.Skip("set OTELWASM_TEST_AOT=1 to run the slow AOT compilation test")
+	}
+
+	factory := NewFactory()
+	cfg := newWasmEdgeConfig("testdata/nop/main.wasm")
+	cfg.RuntimeConfig.Mode = wasmplugin.RuntimeModeCompiled
+	ctx := t.Context()
+
+	sink := new(consumertest.TracesSink)
+	settings := processortest.NewNopSettings(typeStr)
+	tp, err := factory.CreateTraces(ctx, settings, cfg, sink)
+	if err != nil {
+		t.Fatalf("failed to create traces processor: %v", err)
+	}
+
+	traces := ptrace.NewTraces()
+	span := traces.ResourceSpans().AppendEmpty().ScopeSpans().AppendEmpty().Spans().AppendEmpty()
+	span.SetName("aot-span")
+
+	if err := tp.ConsumeTraces(ctx, traces); err != nil {
+		t.Fatalf("failed to consume traces: %v", err)
+	}
+	if len(sink.AllTraces()) != 1 {
+		t.Fatalf("expected 1 traces batch, got %d", len(sink.AllTraces()))
 	}
 
 	if err := tp.Shutdown(ctx); err != nil {

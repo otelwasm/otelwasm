@@ -55,10 +55,18 @@ func TestRuntimeConfigValidate(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "wasmedge runtime with compiled mode",
+			name: "valid wasmedge runtime with compiled mode",
 			config: RuntimeConfig{
 				Name: RuntimeNameWasmEdge,
 				Mode: RuntimeModeCompiled,
+			},
+			wantErr: false,
+		},
+		{
+			name: "wasmedge runtime with invalid mode",
+			config: RuntimeConfig{
+				Name: RuntimeNameWasmEdge,
+				Mode: "invalid",
 			},
 			wantErr: true,
 		},

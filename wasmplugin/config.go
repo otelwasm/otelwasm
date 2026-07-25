@@ -33,6 +33,8 @@ const (
 
 	// RuntimeModeCompiled requests the WASM runtime to use the compiled
 	// mode for executing the WASM module.
+	// For wazero, this uses the compiler backend; for wasmedge, this
+	// AOT-compiles the module at startup.
 	// This mode is faster than the interpreter mode, but it can only be used
 	// on the supported platforms and architectures.
 	// This mode is currently experimental as it doesn't work on all wasm
@@ -63,10 +65,10 @@ func (cfg *RuntimeConfig) Validate() error {
 			return fmt.Errorf("invalid runtime mode: %s", cfg.Mode)
 		}
 	case RuntimeNameWasmEdge:
-		// WasmEdge always executes with its own interpreter; the wazero
-		// specific "compiled" mode is not applicable.
-		if cfg.Mode != "" && cfg.Mode != RuntimeModeInterpreter {
-			return fmt.Errorf("runtime mode %q is not supported by the wasmedge runtime", cfg.Mode)
+		// For WasmEdge, "interpreter" (default) executes the wasm module
+		// directly and "compiled" AOT-compiles it at startup.
+		if cfg.Mode != "" && cfg.Mode != RuntimeModeInterpreter && cfg.Mode != RuntimeModeCompiled {
+			return fmt.Errorf("invalid runtime mode: %s", cfg.Mode)
 		}
 	default:
 		return fmt.Errorf("invalid runtime name: %s", cfg.Name)

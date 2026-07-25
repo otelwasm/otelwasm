@@ -33,6 +33,10 @@ type wasmEdgeRuntime struct {
 	// functions is the set of function names exported by the guest module
 	functions map[string]struct{}
 
+	// aotPath is the path to the AOT-compiled guest module kept on disk for
+	// the lifetime of the runtime. Empty in interpreter mode.
+	aotPath string
+
 	closed bool
 }
 
@@ -59,7 +63,12 @@ func (m wasmEdgeMemory) Write(offset uint32, v []byte) bool {
 }
 
 // newWasmEdgeRuntime initializes a WasmEdge VM and instantiates the guest module.
-func newWasmEdgeRuntime(ctx context.Context, guestBin []byte, rc RuntimeConfig) (guestRuntime, error) {
+// The guest is loaded from guestPath rather than from the in-memory bytes:
+// loading a wasm binary from a buffer would drop the native code section of
+// AOT-compiled universal wasm binaries and silently fall back to the
+// interpreter. Loading from the file keeps precompiled guests running
+// natively. guestBin is used as the AOT compiler input in compiled mode.
+func newWasmEdgeRuntime(ctx context.Context, guestPath string, guestBin []byte, rc RuntimeConfig) (guestRuntime, error) {
 	conf := wasmedge.NewConfigure(wasmedge.WASI)
 	vm := wasmedge.NewVMWithConfig(conf)
 
@@ -91,8 +100,19 @@ func newWasmEdgeRuntime(ctx context.Context, guestBin []byte, rc RuntimeConfig) 
 		return fail(fmt.Errorf("wasm: error registering host module: %w", err))
 	}
 
-	// Load, validate and instantiate the guest module
-	if err := vm.LoadWasmBuffer(guestBin); err != nil {
+	// Load, validate and instantiate the guest module.
+	// In compiled mode, the guest is AOT-compiled first and loaded from the
+	// resulting file.
+	loadPath := guestPath
+	if rc.Mode == RuntimeModeCompiled {
+		aotPath, err := aotCompileGuest(guestBin)
+		if err != nil {
+			return fail(fmt.Errorf("wasm: error AOT-compiling guest: %w", err))
+		}
+		r.aotPath = aotPath
+		loadPath = aotPath
+	}
+	if err := vm.LoadWasmFile(loadPath); err != nil {
 		return fail(fmt.Errorf("wasm: error loading guest: %w", err))
 	}
 	if err := vm.Validate(); err != nil {
@@ -200,6 +220,45 @@ func (r *wasmEdgeRuntime) release() {
 		r.conf.Release()
 		r.conf = nil
 	}
+	if r.aotPath != "" {
+		_ = os.Remove(r.aotPath)
+		r.aotPath = ""
+	}
+}
+
+// aotCompileGuest compiles the guest module ahead-of-time into a universal
+// wasm binary (wasm with a native code section) stored in a temporary file,
+// and returns the path to it. The caller is responsible for removing the file.
+func aotCompileGuest(guestBin []byte) (string, error) {
+	conf := wasmedge.NewConfigure()
+	if conf == nil {
+		return "", fmt.Errorf("failed to create compiler configure")
+	}
+	defer conf.Release()
+	conf.SetCompilerOptimizationLevel(wasmedge.CompilerOptLevel_O2)
+	conf.SetCompilerOutputFormat(wasmedge.CompilerOutputFormat_Wasm)
+
+	compiler := wasmedge.NewCompilerWithConfig(conf)
+	if compiler == nil {
+		return "", fmt.Errorf("failed to create compiler; the WasmEdge library may be built without the AOT compiler")
+	}
+	defer compiler.Release()
+
+	out, err := os.CreateTemp("", "otelwasm-aot-*.wasm")
+	if err != nil {
+		return "", err
+	}
+	outPath := out.Name()
+	if err := out.Close(); err != nil {
+		return "", err
+	}
+
+	if err := compiler.CompileBuffer(guestBin, outPath); err != nil {
+		_ = os.Remove(outPath)
+		return "", err
+	}
+
+	return outPath, nil
 }
 
 // hostFuncKind describes the shape of an otelwasm host function.

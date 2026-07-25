@@ -120,7 +120,7 @@ func NewWasmPlugin(ctx context.Context, cfg *Config, requiredFunctions []string)
 	case "", RuntimeNameWazero:
 		runtime, err = newWazeroRuntime(ctx, bytes, cfg.RuntimeConfig)
 	case RuntimeNameWasmEdge:
-		runtime, err = newWasmEdgeRuntime(ctx, bytes, cfg.RuntimeConfig)
+		runtime, err = newWasmEdgeRuntime(ctx, cfg.Path, bytes, cfg.RuntimeConfig)
 	default:
 		return nil, fmt.Errorf("wasm: invalid runtime name: %s", cfg.RuntimeConfig.Name)
 	}

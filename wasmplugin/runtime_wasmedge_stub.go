@@ -13,6 +13,6 @@ var ErrWasmEdgeNotEnabled = errors.New("wasmedge runtime support is not compiled
 
 // newWasmEdgeRuntime is a stub used when the binary is built without the
 // "wasmedge" build tag. The real implementation lives in runtime_wasmedge.go.
-func newWasmEdgeRuntime(ctx context.Context, guestBin []byte, rc RuntimeConfig) (guestRuntime, error) {
+func newWasmEdgeRuntime(ctx context.Context, guestPath string, guestBin []byte, rc RuntimeConfig) (guestRuntime, error) {
 	return nil, ErrWasmEdgeNotEnabled
 }
