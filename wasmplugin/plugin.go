@@ -9,12 +9,6 @@ import (
 	"os"
 	"sync/atomic"
 
-	"github.com/stealthrocket/wasi-go"
-	wasigo "github.com/stealthrocket/wasi-go/imports"
-	"github.com/stealthrocket/wasi-go/imports/wasi_snapshot_preview1"
-	"github.com/stealthrocket/wazergo"
-	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/api"
 	"go.opentelemetry.io/collector/pdata/plog"
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.opentelemetry.io/collector/pdata/ptrace"
@@ -76,30 +70,12 @@ func (s StatusCode) String() string {
 
 // WasmPlugin represents a WebAssembly plugin for OpenTelemetry components
 type WasmPlugin struct {
-	// Runtime is the WebAssembly runtime
-	Runtime wazero.Runtime
-
-	// System is the WASI system implementation
-	Sys wasi.System
-
-	// Module is the instantiated WASM module
-	Module api.Module
-
 	// PluginConfigJSON is the JSON representation of the plugin config
 	PluginConfigJSON []byte
 
-	// Exported functions from the WASM module
-	ExportedFunctions map[string]api.Function
-
-	// wasiP1HostModule is the host module instance initialized by wasi-go.
-	// This instance holds necessary states for WASI host functions, which needs to be passed to context when calling the guest.
-	// This is a workaround to avoid panic when calling wasi functions with different context than the one used to instantiate the host module.
-	// TODO: Remove this if possible after replacing WASI implementation with our own.
-	wasiP1HostModule *wasi_snapshot_preview1.Module
+	// runtime is the underlying WebAssembly runtime hosting the guest module
+	runtime guestRuntime
 }
-
-// stackKey is the key used to store the stack in the context
-type stackKey struct{}
 
 // Stack holds the data being passed between the host and the guest
 type Stack struct {
@@ -124,11 +100,6 @@ type Stack struct {
 	handles []any
 }
 
-// paramsFromContext retrieves the Stack from the context
-func paramsFromContext(ctx context.Context) *Stack {
-	return ctx.Value(stackKey{}).(*Stack)
-}
-
 // NewWasmPlugin creates a new WasmPlugin instance
 func NewWasmPlugin(ctx context.Context, cfg *Config, requiredFunctions []string) (*WasmPlugin, error) {
 	if err := cfg.Validate(); err != nil {
@@ -146,131 +117,47 @@ func NewWasmPlugin(ctx context.Context, cfg *Config, requiredFunctions []string)
 		return nil, err
 	}
 
-	runtime, guest, err := prepareRuntime(ctx, bytes, cfg.RuntimeConfig)
+	var runtime guestRuntime
+	switch cfg.RuntimeConfig.Name {
+	// An empty name falls back to the default runtime (wazero) for
+	// backward compatibility.
+	case "", RuntimeNameWazero:
+		runtime, err = newWazeroRuntime(ctx, bytes, cfg.RuntimeConfig)
+	case RuntimeNameWasmEdge:
+		runtime, err = newWasmEdgeRuntime(ctx, cfg.Path, bytes, cfg.RuntimeConfig)
+	default:
+		return nil, fmt.Errorf("wasm: invalid runtime name: %s", cfg.RuntimeConfig.Name)
+	}
 	if err != nil {
 		return nil, err
 	}
 
-	// Instantiate WASI module (wasi_snapshot_preview1 and wasmedge socket extension)
-	var sys wasi.System
-	ctx, sys, err = wasigo.NewBuilder().
-		WithSocketsExtension(wasmEdgeV2Extension, guest).
-		WithEnv(os.Environ()...).Instantiate(ctx, runtime)
-	if err != nil {
-		return nil, fmt.Errorf("wasm: error instantiating wasi module: %w", err)
-	}
-
-	// Extract the wasi host module instance from the context as a workaround
-	// to avoid panic when calling wasi functions with different context than the one used to instantiate the host module.
-	wasiP1HostModule, ok := moduleInstanceFor[*wasi_snapshot_preview1.Module](ctx)
-	if !ok {
-		return nil, fmt.Errorf("wasm: error retrieving wasi host module instance")
-	}
-
-	if _, err := instantiateHostModule(ctx, runtime); err != nil {
-		return nil, fmt.Errorf("wasm: error instantiating host module: %w", err)
-	}
-
-	config := wazero.NewModuleConfig().
-		WithStartFunctions("_initialize"). // reactor module
-		WithStdout(os.Stdout).
-		WithStderr(os.Stderr)
-
-	mod, err := runtime.InstantiateModule(ctx, guest, config)
-	if err != nil {
-		return nil, fmt.Errorf("wasm: error instantiating guest: %w", err)
-	}
-
-	// Check if all required functions are exported
-	exportedFunctions := make(map[string]api.Function)
-	for _, funcName := range requiredFunctions {
-		fn := mod.ExportedFunction(funcName)
-		if fn == nil {
+	// Check if all required and built-in guest functions are exported
+	for _, funcName := range append(requiredFunctions, builtInGuestFunctions...) {
+		if !runtime.HasFunction(funcName) {
+			_ = runtime.Close(ctx)
 			return nil, fmt.Errorf("wasm: %s is not exported: %w", funcName, ErrRequiredFunctionNotExported)
 		}
-		exportedFunctions[funcName] = fn
-	}
-
-	// Check if all built-in guest functions are exported
-	for _, funcName := range builtInGuestFunctions {
-		fn := mod.ExportedFunction(funcName)
-		if fn == nil {
-			return nil, fmt.Errorf("wasm: %s is not exported: %w", funcName, ErrRequiredFunctionNotExported)
-		}
-		exportedFunctions[funcName] = fn
 	}
 
 	// Convert the plugin config to JSON representation
 	pluginConfigJSON, err := json.Marshal(cfg.PluginConfig)
 	if err != nil {
+		_ = runtime.Close(ctx)
 		return nil, fmt.Errorf("wasm: error marshalling plugin config: %w", err)
 	}
 
 	plugin := &WasmPlugin{
-		Runtime:           runtime,
-		Sys:               sys,
-		Module:            mod,
-		PluginConfigJSON:  pluginConfigJSON,
-		ExportedFunctions: exportedFunctions,
-		wasiP1HostModule:  wasiP1HostModule,
+		PluginConfigJSON: pluginConfigJSON,
+		runtime:          runtime,
 	}
 
 	return plugin, nil
 }
 
-// prepareRuntime initializes a new WebAssembly runtime
-func prepareRuntime(ctx context.Context, guestBin []byte, rc RuntimeConfig) (runtime wazero.Runtime, guest wazero.CompiledModule, err error) {
-	// TODO: Switch to compiler backend after fixing the memory allocator issue in wazero
-	var wrc wazero.RuntimeConfig
-	switch rc.Mode {
-	case RuntimeModeInterpreter:
-		wrc = wazero.NewRuntimeConfigInterpreter()
-	case RuntimeModeCompiled:
-		// TODO: Add validation of supported platforms and architectures
-		wrc = wazero.NewRuntimeConfigCompiler()
-	default:
-		return nil, nil, fmt.Errorf("wasm: invalid runtime mode: %s", rc.Mode)
-	}
-	runtime = wazero.NewRuntimeWithConfig(ctx, wrc)
-
-	guest, err = compileGuest(ctx, runtime, guestBin)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return runtime, guest, nil
-}
-
-// compileGuest compiles the guest module
-func compileGuest(ctx context.Context, runtime wazero.Runtime, guestBin []byte) (guest wazero.CompiledModule, err error) {
-	if guest, err = runtime.CompileModule(ctx, guestBin); err != nil {
-		err = fmt.Errorf("wasm: error compiling guest: %w", err)
-	} else if _, ok := guest.ExportedMemories()[guestExportMemory]; !ok {
-		// This section checks if the guest exports memory section.
-		// As of WebAssembly Core Specification 2.0, there can be at most one memory.
-		// https://webassembly.github.io/spec/core/syntax/modules.html#memories
-		err = fmt.Errorf("wasm: guest doesn't export memory[%s]", guestExportMemory)
-	}
-	return
-}
-
-// createContextWithStack creates a new context with a Stack
-func createContextWithStack(ctx context.Context, stack *Stack) context.Context {
-	return context.WithValue(ctx, stackKey{}, stack)
-}
-
 // ProcessFunctionCall executes a WASM function and handles stack management
 func (p *WasmPlugin) ProcessFunctionCall(ctx context.Context, functionName string, stack *Stack) ([]uint64, error) {
-	ctx = createContextWithStack(ctx, stack)
-	// Set the WASI host module instance in the context
-	ctx = withModuleInstance(ctx, p.wasiP1HostModule)
-
-	fn, ok := p.ExportedFunctions[functionName]
-	if !ok {
-		return nil, fmt.Errorf("wasm: function not found: %s", functionName)
-	}
-
-	return fn.Call(ctx)
+	return p.runtime.CallFunction(ctx, functionName, stack)
 }
 
 func (p *WasmPlugin) supportedTelemetryTypes(ctx context.Context) (telemetryType, error) {
@@ -312,260 +199,7 @@ func (p *WasmPlugin) IsTracesSupported(ctx context.Context) (bool, error) {
 	return telemetryTypes&telemetryTypeTraces != 0, nil
 }
 
-// Shutdown closes the WASM runtime and system
+// Shutdown closes the WASM runtime
 func (p *WasmPlugin) Shutdown(ctx context.Context) error {
-	if err := p.Sys.Close(ctx); err != nil {
-		return fmt.Errorf("wasm: error closing system: %w", err)
-	}
-	if err := p.Runtime.Close(ctx); err != nil {
-		return fmt.Errorf("wasm: error closing runtime: %w", err)
-	}
-	return nil
-}
-
-// Host function implementations
-func currentTracesFn(ctx context.Context, mod api.Module, stack []uint64) {
-	buf := uint32(stack[0])
-	bufLimit := uint32(stack[1])
-
-	traces := paramsFromContext(ctx).CurrentTraces
-	stack[0] = uint64(marshalTraceIfUnderLimit(mod.Memory(), traces, buf, bufLimit))
-}
-
-func currentMetricsFn(ctx context.Context, mod api.Module, stack []uint64) {
-	buf := uint32(stack[0])
-	bufLimit := uint32(stack[1])
-
-	metrics := paramsFromContext(ctx).CurrentMetrics
-	stack[0] = uint64(marshalMetricsIfUnderLimit(mod.Memory(), metrics, buf, bufLimit))
-}
-
-func currentLogsFn(ctx context.Context, mod api.Module, stack []uint64) {
-	buf := uint32(stack[0])
-	bufLimit := uint32(stack[1])
-
-	logs := paramsFromContext(ctx).CurrentLogs
-	stack[0] = uint64(marshalLogsIfUnderLimit(mod.Memory(), logs, buf, bufLimit))
-}
-
-func getPluginConfigFn(ctx context.Context, mod api.Module, stack []uint64) {
-	buf := uint32(stack[0])
-	bufLimit := uint32(stack[1])
-
-	pluginConfig := paramsFromContext(ctx).PluginConfigJSON
-	stack[0] = uint64(writeBytesIfUnderLimit(mod.Memory(), pluginConfig, buf, bufLimit))
-}
-
-func getShutdownRequestedFn(ctx context.Context, mod api.Module, stack []uint64) {
-	// Read the shutdown requested flag from the stack
-	shutdownRequested := paramsFromContext(ctx).RequestedShutdown.Load()
-
-	// Write the shutdown requested flag to the stack
-	if shutdownRequested {
-		stack[0] = 1
-	} else {
-		stack[0] = 0
-	}
-}
-
-func setResultTracesFn(ctx context.Context, mod api.Module, stack []uint64) {
-	// Read buffer pointer and size from the stack
-	buf := uint32(stack[0])
-	size := uint32(stack[1])
-
-	// Read the serialized traces from WASM memory
-	tracesBytes, ok := mod.Memory().Read(buf, size)
-	if !ok {
-		panic("out of memory reading result traces") // Bug: caller passed a length outside memory
-	}
-
-	// Unmarshal the traces
-	unmarshaler := ptrace.ProtoUnmarshaler{}
-	traces, err := unmarshaler.UnmarshalTraces(tracesBytes)
-	if err != nil {
-		panic(err) // Bug: in unmarshaller
-	}
-
-	// Store the result traces in context
-	paramsFromContext(ctx).ResultTraces = traces
-	onResultTracesChange := paramsFromContext(ctx).OnResultTracesChange
-	if onResultTracesChange != nil {
-		onResultTracesChange(traces)
-	}
-}
-
-func setResultMetricsFn(ctx context.Context, mod api.Module, stack []uint64) {
-	// Read buffer pointer and size from the stack
-	buf := uint32(stack[0])
-	size := uint32(stack[1])
-
-	// Read the serialized metrics from WASM memory
-	metricsBytes, ok := mod.Memory().Read(buf, size)
-	if !ok {
-		panic("out of memory reading result metrics") // Bug: caller passed a length outside memory
-	}
-
-	// Unmarshal the metrics
-	unmarshaler := pmetric.ProtoUnmarshaler{}
-	metrics, err := unmarshaler.UnmarshalMetrics(metricsBytes)
-	if err != nil {
-		panic(err) // Bug: in unmarshaller
-	}
-
-	// Store the result metrics in context
-	paramsFromContext(ctx).ResultMetrics = metrics
-	onResultMetricsChange := paramsFromContext(ctx).OnResultMetricsChange
-	if onResultMetricsChange != nil {
-		onResultMetricsChange(metrics)
-	}
-}
-
-func setResultLogsFn(ctx context.Context, mod api.Module, stack []uint64) {
-	// Read buffer pointer and size from the stack
-	buf := uint32(stack[0])
-	size := uint32(stack[1])
-
-	// Read the serialized logs from WASM memory
-	logsBytes, ok := mod.Memory().Read(buf, size)
-	if !ok {
-		panic("out of memory reading result logs") // Bug: caller passed a length outside memory
-	}
-
-	// Unmarshal the logs
-	unmarshaler := plog.ProtoUnmarshaler{}
-	logs, err := unmarshaler.UnmarshalLogs(logsBytes)
-	if err != nil {
-		panic(err) // Bug: in unmarshaller
-	}
-
-	// Store the result logs in context
-	paramsFromContext(ctx).ResultLogs = logs
-	onResultLogsChange := paramsFromContext(ctx).OnResultLogsChange
-	if onResultLogsChange != nil {
-		onResultLogsChange(logs)
-	}
-}
-
-func setResultStatusReasonFn(ctx context.Context, mod api.Module, stack []uint64) {
-	// Read buffer pointer and size from the stack
-	buf := uint32(stack[0])
-	size := uint32(stack[1])
-
-	// Read the status reason string from WASM memory
-	reasonBytes, ok := mod.Memory().Read(buf, size)
-	if !ok {
-		panic("out of memory reading status reason") // Bug: caller passed a length outside memory
-	}
-
-	// Store the status reason in context
-	paramsFromContext(ctx).StatusReason = string(reasonBytes)
-}
-
-// instantiateHostModule creates and instantiates the host module with exported functions
-func instantiateHostModule(ctx context.Context, runtime wazero.Runtime) (api.Module, error) {
-	return runtime.NewHostModuleBuilder(otelWasm).
-		NewFunctionBuilder().
-		WithGoModuleFunction(api.GoModuleFunc(currentTracesFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{api.ValueTypeI32}).
-		WithParameterNames("buf", "buf_limit").Export(currentTraces).
-		NewFunctionBuilder().
-		WithGoModuleFunction(api.GoModuleFunc(currentMetricsFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{api.ValueTypeI32}).
-		WithParameterNames("buf", "buf_limit").Export(currentMetrics).
-		NewFunctionBuilder().
-		WithGoModuleFunction(api.GoModuleFunc(currentLogsFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{api.ValueTypeI32}).
-		WithParameterNames("buf", "buf_limit").Export(currentLogs).
-		NewFunctionBuilder().
-		WithGoModuleFunction(api.GoModuleFunc(setResultTracesFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{}).
-		WithParameterNames("buf", "buf_len").Export(setResultTraces).
-		NewFunctionBuilder().
-		WithGoModuleFunction(api.GoModuleFunc(setResultMetricsFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{}).
-		WithParameterNames("buf", "buf_len").Export(setResultMetrics).
-		NewFunctionBuilder().
-		WithGoModuleFunction(api.GoModuleFunc(setResultLogsFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{}).
-		WithParameterNames("buf", "buf_len").Export(setResultLogs).
-		NewFunctionBuilder().
-		WithGoModuleFunction(api.GoModuleFunc(getPluginConfigFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{api.ValueTypeI32}).
-		WithParameterNames("buf", "buf_limit").Export(getPluginConfig).
-		NewFunctionBuilder().
-		WithGoModuleFunction(api.GoModuleFunc(setResultStatusReasonFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{}).
-		WithParameterNames("buf", "buf_len").Export(setResultStatusReason).
-		NewFunctionBuilder().
-		WithGoModuleFunction(api.GoModuleFunc(getShutdownRequestedFn), []api.ValueType{}, []api.ValueType{api.ValueTypeI32}).
-		Export(getShutdownRequested).
-		NewFunctionBuilder().
-		WithGoModuleFunction(api.GoModuleFunc(pdataCurrentTracesFn), []api.ValueType{}, []api.ValueType{api.ValueTypeI32}).
-		Export(pdataCurrentTraces).
-		NewFunctionBuilder().
-		WithGoModuleFunction(api.GoModuleFunc(pdataCommitCurrentTracesFn), []api.ValueType{}, []api.ValueType{}).
-		Export(pdataCommitCurrentTraces).
-		NewFunctionBuilder().
-		WithGoModuleFunction(api.GoModuleFunc(pdataCurrentMetricsFn), []api.ValueType{}, []api.ValueType{api.ValueTypeI32}).
-		Export(pdataCurrentMetrics).
-		NewFunctionBuilder().
-		WithGoModuleFunction(api.GoModuleFunc(pdataCommitCurrentMetricsFn), []api.ValueType{}, []api.ValueType{}).
-		Export(pdataCommitCurrentMetrics).
-		NewFunctionBuilder().
-		WithGoModuleFunction(api.GoModuleFunc(pdataCurrentLogsFn), []api.ValueType{}, []api.ValueType{api.ValueTypeI32}).
-		Export(pdataCurrentLogs).
-		NewFunctionBuilder().
-		WithGoModuleFunction(api.GoModuleFunc(pdataCommitCurrentLogsFn), []api.ValueType{}, []api.ValueType{}).
-		Export(pdataCommitCurrentLogs).
-		NewFunctionBuilder().
-		WithGoModuleFunction(api.GoModuleFunc(pdataGetF64Fn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{api.ValueTypeF64}).
-		WithParameterNames("handle", "field").Export(pdataGetF64).
-		NewFunctionBuilder().
-		WithGoModuleFunction(api.GoModuleFunc(pdataSetF64Fn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32, api.ValueTypeF64}, []api.ValueType{}).
-		WithParameterNames("handle", "field", "value").Export(pdataSetF64).
-		NewFunctionBuilder().
-		WithGoModuleFunction(api.GoModuleFunc(pdataGetI64Fn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{api.ValueTypeI64}).
-		WithParameterNames("handle", "field").Export(pdataGetI64).
-		NewFunctionBuilder().
-		WithGoModuleFunction(api.GoModuleFunc(pdataSetI64Fn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32, api.ValueTypeI64}, []api.ValueType{}).
-		WithParameterNames("handle", "field", "value").Export(pdataSetI64).
-		NewFunctionBuilder().
-		WithGoModuleFunction(api.GoModuleFunc(pdataGetStrFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32, api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{api.ValueTypeI32}).
-		WithParameterNames("handle", "field", "buf", "buf_limit").Export(pdataGetStr).
-		NewFunctionBuilder().
-		WithGoModuleFunction(api.GoModuleFunc(pdataSetStrFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32, api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{}).
-		WithParameterNames("handle", "field", "ptr", "len").Export(pdataSetStr).
-		NewFunctionBuilder().
-		WithGoModuleFunction(api.GoModuleFunc(pdataGetMsgFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{api.ValueTypeI32}).
-		WithParameterNames("handle", "field").Export(pdataGetMsg).
-		NewFunctionBuilder().
-		WithGoModuleFunction(api.GoModuleFunc(pdataSliceLenFn), []api.ValueType{api.ValueTypeI32}, []api.ValueType{api.ValueTypeI32}).
-		WithParameterNames("handle").Export(pdataSliceLen).
-		NewFunctionBuilder().
-		WithGoModuleFunction(api.GoModuleFunc(pdataSliceGetFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{api.ValueTypeI32}).
-		WithParameterNames("handle", "index").Export(pdataSliceGet).
-		NewFunctionBuilder().
-		WithGoModuleFunction(api.GoModuleFunc(pdataMapLenFn), []api.ValueType{api.ValueTypeI32}, []api.ValueType{api.ValueTypeI32}).
-		WithParameterNames("handle").Export(pdataMapLen).
-		NewFunctionBuilder().
-		WithGoModuleFunction(api.GoModuleFunc(pdataMapGetStrFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32, api.ValueTypeI32, api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{api.ValueTypeI32}).
-		WithParameterNames("handle", "key_ptr", "key_len", "buf", "buf_limit").Export(pdataMapGetStr).
-		NewFunctionBuilder().
-		WithGoModuleFunction(api.GoModuleFunc(pdataMapPutStrFn), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32, api.ValueTypeI32, api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{}).
-		WithParameterNames("handle", "key_ptr", "key_len", "val_ptr", "val_len").Export(pdataMapPutStr).
-		Instantiate(ctx)
-}
-
-// moduleInstanceFor returns the module instance from the context that contains the internal
-// state required for WASI host functions.
-// NOTE: wasi-go returns context containing internal state when initializing the host module,
-// and the same context is required when calling wasi functions exposed by wasi-go.
-// This is a kind of workaround to avoid panic when calling
-// wasi functions with different context than the one used to instantiate the host module.
-func moduleInstanceFor[T wazergo.Module](ctx context.Context) (res T, ok bool) {
-	res, ok = ctx.Value((*wazergo.ModuleInstance[T])(nil)).(T)
-	return
-}
-
-// withModuleInstance returns a Go context inheriting from ctx and containing the
-// state needed for module instantiated from wazero host module to properly bind
-// their methods to their receiver (e.g. the module instance).
-// NOTE: wasi-go returns context containing internal state when initializing the
-// host module, and the same context is required when calling wasi functions
-// exposed by wasi-go. This is a kind of workaround to avoid panic when calling
-// wasi functions with different context than the one used to instantiate the host module.
-func withModuleInstance[T wazergo.Module](ctx context.Context, instance T) context.Context {
-	return context.WithValue(ctx, (*wazergo.ModuleInstance[T])(nil), instance)
+	return p.runtime.Close(ctx)
 }

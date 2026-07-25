@@ -31,6 +31,53 @@ func TestRuntimeConfigValidate(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "valid wazero runtime",
+			config: RuntimeConfig{
+				Name: RuntimeNameWazero,
+				Mode: RuntimeModeInterpreter,
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid wasmedge runtime",
+			config: RuntimeConfig{
+				Name: RuntimeNameWasmEdge,
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid wasmedge runtime with interpreter mode",
+			config: RuntimeConfig{
+				Name: RuntimeNameWasmEdge,
+				Mode: RuntimeModeInterpreter,
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid wasmedge runtime with compiled mode",
+			config: RuntimeConfig{
+				Name: RuntimeNameWasmEdge,
+				Mode: RuntimeModeCompiled,
+			},
+			wantErr: false,
+		},
+		{
+			name: "wasmedge runtime with invalid mode",
+			config: RuntimeConfig{
+				Name: RuntimeNameWasmEdge,
+				Mode: "invalid",
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid runtime name",
+			config: RuntimeConfig{
+				Name: "invalid",
+				Mode: RuntimeModeInterpreter,
+			},
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -52,18 +99,26 @@ func TestRuntimeConfigDefault(t *testing.T) {
 		{
 			name:           "empty mode",
 			config:         RuntimeConfig{},
-			expectedConfig: RuntimeConfig{Mode: RuntimeModeInterpreter},
+			expectedConfig: RuntimeConfig{Name: RuntimeNameWazero, Mode: RuntimeModeInterpreter},
 		},
 		{
 			name:           "compiled mode",
 			config:         RuntimeConfig{Mode: RuntimeModeCompiled},
-			expectedConfig: RuntimeConfig{Mode: RuntimeModeCompiled},
+			expectedConfig: RuntimeConfig{Name: RuntimeNameWazero, Mode: RuntimeModeCompiled},
+		},
+		{
+			name:           "wasmedge runtime keeps mode empty",
+			config:         RuntimeConfig{Name: RuntimeNameWasmEdge},
+			expectedConfig: RuntimeConfig{Name: RuntimeNameWasmEdge, Mode: ""},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.config.Default()
+			if tt.config.Name != tt.expectedConfig.Name {
+				t.Errorf("RuntimeConfig.Default() set Name = %v, want %v", tt.config.Name, tt.expectedConfig.Name)
+			}
 			if tt.config.Mode != tt.expectedConfig.Mode {
 				t.Errorf("RuntimeConfig.Default() set Mode = %v, want %v", tt.config.Mode, tt.expectedConfig.Mode)
 			}
