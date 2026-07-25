@@ -8,12 +8,16 @@ dist:
 
 exporters:
   - gomod: github.com/otelwasm/otelwasm/wasmexporter v0.0.0
+  # nopexporter is used by the OpAMP Supervisor's bootstrap config.
+  - gomod: go.opentelemetry.io/collector/exporter/nopexporter v0.126.0
 
 processors:
   - gomod: github.com/otelwasm/otelwasm/wasmprocessor v0.0.0
 
 receivers:
   - gomod: github.com/otelwasm/otelwasm/wasmreceiver v0.0.0
+  # nopreceiver is used by the OpAMP Supervisor's bootstrap config.
+  - gomod: go.opentelemetry.io/collector/receiver/nopreceiver v0.126.0
 
 # --- end of otelwasm components ---
 
@@ -23,6 +27,9 @@ extensions:
   - gomod: go.opentelemetry.io/collector/extension/zpagesextension v0.125.0
   - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.125.0
   - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension v0.125.0
+  # opampextension is required to manage the collector via OpAMP (e.g. by the
+  # OpAMP Supervisor). See examples/opamp for a demo.
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/extension/opampextension v0.126.0
 
 connectors:
   - gomod: go.opentelemetry.io/collector/connector/forwardconnector v0.125.0

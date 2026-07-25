@@ -154,6 +154,16 @@ curl --fail --header 'Content-Type: application/json' \
 
 The request should return HTTP 200 and the Collector should print the `oci-plugin-roundtrip` span. Stop the Collector, then remove the registry with `docker stop otelwasm-registry`.
 
+## Managing the collector via OpAMP
+
+The `otelwasmcol` distribution includes the
+[opampextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/extension/opampextension),
+so it can be managed remotely via [OpAMP](https://opentelemetry.io/docs/specs/opamp/)
+using the OpAMP Supervisor. Combined with the OCI/HTTP plugin sources, an
+OpAMP server can remotely reconfigure — and even swap — the WASM plugins
+running in a collector without touching the host. See
+[examples/opamp](./examples/opamp) for a working demo.
+
 ## Acknowledgements
 
 This project originally started by Anuraag (Rag) Agrawal (@anuraaga). Most of the code and design is based on [his prior work](https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/11772).
