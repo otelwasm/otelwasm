@@ -5,6 +5,22 @@ import "fmt"
 // PluginConfig is a generic configuration type that can be passed to WASM modules
 type PluginConfig map[string]interface{}
 
+// RuntimeName selects the WebAssembly runtime implementation used to
+// execute the WASM plugin.
+type RuntimeName string
+
+const (
+	// RuntimeNameWazero runs the WASM plugin on the wazero runtime.
+	// wazero is a pure-Go runtime and requires no external dependencies.
+	// This is the default runtime if not specified.
+	RuntimeNameWazero RuntimeName = "wazero"
+
+	// RuntimeNameWasmEdge runs the WASM plugin on the WasmEdge runtime.
+	// WasmEdge support requires building with the "wasmedge" build tag and
+	// the WasmEdge shared library installed on the system.
+	RuntimeNameWasmEdge RuntimeName = "wasmedge"
+)
+
 type RuntimeMode string
 
 const (
@@ -28,14 +44,32 @@ const (
 
 // RuntimeConfig is the configuration for the WASM plugin runtime.
 type RuntimeConfig struct {
+	// Name is the WebAssembly runtime implementation to use.
+	// Valid values are "wazero" (default) and "wasmedge".
+	Name RuntimeName `mapstructure:"name,omitempty"`
+
 	// Mode is the runtime mode for the WASM plugin.
 	// The default is "interpreter".
+	// This option only applies to the wazero runtime.
 	Mode RuntimeMode `mapstructure:"mode,omitempty"`
 }
 
 func (cfg *RuntimeConfig) Validate() error {
-	if cfg.Mode != RuntimeModeInterpreter && cfg.Mode != RuntimeModeCompiled {
-		return fmt.Errorf("invalid runtime mode: %s", cfg.Mode)
+	switch cfg.Name {
+	// An empty name falls back to the default runtime (wazero) for
+	// backward compatibility.
+	case "", RuntimeNameWazero:
+		if cfg.Mode != RuntimeModeInterpreter && cfg.Mode != RuntimeModeCompiled {
+			return fmt.Errorf("invalid runtime mode: %s", cfg.Mode)
+		}
+	case RuntimeNameWasmEdge:
+		// WasmEdge always executes with its own interpreter; the wazero
+		// specific "compiled" mode is not applicable.
+		if cfg.Mode != "" && cfg.Mode != RuntimeModeInterpreter {
+			return fmt.Errorf("runtime mode %q is not supported by the wasmedge runtime", cfg.Mode)
+		}
+	default:
+		return fmt.Errorf("invalid runtime name: %s", cfg.Name)
 	}
 	return nil
 }
@@ -43,13 +77,17 @@ func (cfg *RuntimeConfig) Validate() error {
 // Default sets the default values for the runtime configuration
 // if they are not set.
 func (cfg *RuntimeConfig) Default() {
-	if cfg.Mode == "" {
+	if cfg.Name == "" {
+		cfg.Name = DefaultRuntimeConfig.Name
+	}
+	if cfg.Mode == "" && cfg.Name == RuntimeNameWazero {
 		cfg.Mode = DefaultRuntimeConfig.Mode
 	}
 }
 
 // DefaultRuntimeConfig is the default configuration for the WASM plugin runtime.
 var DefaultRuntimeConfig = RuntimeConfig{
+	Name: RuntimeNameWazero,
 	Mode: RuntimeModeInterpreter,
 }
 

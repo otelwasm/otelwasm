@@ -34,6 +34,24 @@ test: copy-wasm-examples
 	@(cd wasmreceiver; $(GOCMD) test -v -tags docker ./...)
 	@(cd guest; $(GOCMD) test -v -tags docker ./...)
 
+# --- WasmEdge runtime support ---
+# Building and testing with the WasmEdge runtime requires the WasmEdge shared
+# library. Install it with `make install-wasmedge` (installs to ~/.wasmedge).
+WASMEDGE_VERSION ?= 0.14.1
+WASMEDGE_DIR ?= $(HOME)/.wasmedge
+WASMEDGE_CGO_ENV := CGO_ENABLED=1 CGO_CFLAGS="-I$(WASMEDGE_DIR)/include" CGO_LDFLAGS="-L$(WASMEDGE_DIR)/lib -lwasmedge -Wl,-rpath,$(WASMEDGE_DIR)/lib"
+
+.PHONY: install-wasmedge
+install-wasmedge:
+	curl -sSf https://raw.githubusercontent.com/WasmEdge/WasmEdge/master/utils/install_v2.sh | bash -s -- -v $(WASMEDGE_VERSION)
+
+.PHONY: test-wasmedge
+test-wasmedge: copy-wasm-examples
+	@(cd wasmplugin; $(WASMEDGE_CGO_ENV) $(GOCMD) test -v -tags wasmedge ./...)
+	@(cd wasmprocessor; $(WASMEDGE_CGO_ENV) $(GOCMD) test -v -tags wasmedge ./...)
+	@(cd wasmexporter; $(WASMEDGE_CGO_ENV) $(GOCMD) test -v -tags wasmedge ./...)
+	@(cd wasmreceiver; $(WASMEDGE_CGO_ENV) $(GOCMD) test -v -tags wasmedge ./...)
+
 define build-wasm-example
 $(1): $(1:.wasm=.go)
 	@(cd $$(patsubst %/main.wasm,%,$$@); $(GOCMD) run $(wasibuilder) $(GOCMD) build -buildmode=c-shared -o main.wasm main.go)
@@ -82,6 +100,11 @@ genotelwasmcol:
 otelwasmcol: genotelwasmcol
 	cd ./cmd/otelwasmcol && GO111MODULE=on CGO_ENABLED=0 $(GOCMD) build -trimpath -o ../../bin/otelwasmcol_$(GOOS)_$(GOARCH)$(EXTENSION) \
 		-tags $(GO_BUILD_TAGS) .
+
+.PHONY: otelwasmcol-wasmedge
+otelwasmcol-wasmedge: genotelwasmcol
+	cd ./cmd/otelwasmcol && GO111MODULE=on $(WASMEDGE_CGO_ENV) $(GOCMD) build -trimpath -o ../../bin/otelwasmcol_$(GOOS)_$(GOARCH)$(EXTENSION) \
+		-tags wasmedge .
 
 .PHONY: factorybuilder
 factorybuilder:

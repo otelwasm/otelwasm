@@ -3,6 +3,7 @@ module github.com/otelwasm/otelwasm/wasmplugin
 go 1.24.2
 
 require (
+	github.com/second-state/WasmEdge-go v0.14.0
 	github.com/stealthrocket/wasi-go v0.8.0
 	github.com/stealthrocket/wazergo v0.19.1
 	github.com/tetratelabs/wazero v1.9.0
