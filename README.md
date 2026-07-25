@@ -24,6 +24,22 @@ make build-wasm-examples
 
 Each wasm binary is generated under each directory, for example, the wasm version of `attributesprocessor` is generated at `examples/processor/attributes/processor/main.wasm`.
 
+### Test loading a Wasm module over HTTP locally
+
+Start a local HTTP server from the project root in a separate terminal.
+
+```shell
+python3 -m http.server 8000 --directory examples
+```
+
+Then use the module's HTTP URL as its `path`, for example:
+
+```yaml
+processors:
+  wasm/attributes:
+    path: "http://localhost:8000/processor/attributesprocessor/main.wasm"
+```
+
 ## How to run wasm-powered OTel Collector
 
 After building example wasm binaries and otelwasmcol itself, now you're ready to try.

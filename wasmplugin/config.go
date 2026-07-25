@@ -55,7 +55,8 @@ var DefaultRuntimeConfig = RuntimeConfig{
 
 // Config defines the common configuration for WASM components
 type Config struct {
-	// Path to the WASM module file
+	// Path to the WASM module. Local files use a path without a scheme.
+	// Supported URL schemes are http and https.
 	Path string `mapstructure:"path"`
 
 	// PluginConfig is the configuration to be passed to the WASM module
