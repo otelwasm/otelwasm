@@ -111,6 +111,51 @@ Observations:
 - Consequently the optimal runtime flips with the ABI: **proto ABI → WasmEdge AOT; handle ABI → wazero compiled.**
 - The WasmEdge handle numbers include some overhead from the wazero-convention adapter (`adaptWazeroHostFn`), but the dominant cost is the CGO round-trip per host call in the wasmedge-go bindings.
 
+## Workload 3: guest language comparison (handle ABI, logs)
+
+The identical handle-ABI workload (walk every log record, upsert one string
+attribute) implemented in three guest languages:
+
+- **go** — Go 1.24 `c-shared` via the `guest/pdatahandle` SDK (the guest from Workload 2)
+- **tinygo** — TinyGo 0.41, direct `//go:wasmimport` declarations (the SDK's pdata dependency doesn't compile under TinyGo), built with `-scheduler=none -gc=conservative -no-debug`
+- **rust** — Rust (wasm32-wasip1, cdylib), direct `extern "C"` imports, `opt-level=3` + LTO
+
+Benchmark: `BenchmarkHandleLogsGuestFlavors` (wazero) / `BenchmarkHandleLogsGuestFlavorsWasmEdge` (WasmEdge), medians of 3 runs.
+
+### binary size and compile cost
+
+| Guest | wasm size | WasmEdge AOT compile (O2) |
+|---|---:|---:|
+| go | 27 MB | ~7 min |
+| tinygo | 10.1 KB | 0.7 s |
+| rust | 647 B | 0.06 s |
+
+### time per batch (100 records)
+
+| Runtime | go | tinygo | rust |
+|---|---:|---:|---:|
+| wazero interpreter | 183.9 µs | 31.0 µs | **27.6 µs** |
+| wazero compiled | 27.8 µs | 24.3 µs | **20.1 µs** |
+| WasmEdge interpreter | 422 µs | 248 µs | **204 µs** |
+| WasmEdge AOT | 262 µs | 237 µs | **194 µs** |
+
+### time per batch (1000 records)
+
+| Runtime | go | tinygo | rust |
+|---|---:|---:|---:|
+| wazero interpreter | 1.87 ms | 283 µs | **248 µs** |
+| wazero compiled | 272 µs | 220 µs | **184 µs** |
+| WasmEdge interpreter | 4.22 ms | 2.44 ms | **1.92 ms** |
+| WasmEdge AOT | 2.62 ms | 2.33 ms | **1.86 ms** |
+
+Observations:
+
+- **Rust is the fastest guest in every configuration**; Rust + wazero compiled (20.1 µs / 100 records) is the fastest wasm result measured in this document, ~9x from native.
+- **Lean guests transform the wazero interpreter**: go 184 µs → rust 27.6 µs (6.7x) at 100 records, because the interpreter no longer executes the Go runtime's bookkeeping. A zero-dependency, pure-Go deployment (wazero interpreter + Rust/TinyGo guest) gets within ~40% of the JIT.
+- On WasmEdge the guest language matters much less — the per-host-call CGO cost dominates (all flavors make the same ~500 host calls per 100-record batch).
+- **TinyGo pitfall**: the default (asyncify-based) scheduler adds a large fixed cost to every exported call — ~3 ms under the wazero interpreter, ~36 µs compiled. `-scheduler=none` removes it (this workload needs no goroutines). `-gc=conservative` vs `-gc=leaking` made no measurable difference here.
+- TinyGo/Rust guests also make WasmEdge AOT practical to generate at build time (sub-second vs minutes for big-Go guests).
+
 ## Startup / compilation costs
 
 | Item | Cost |
@@ -145,4 +190,6 @@ $ export CGO_LDFLAGS="-L$HOME/.wasmedge/lib -lwasmedge -Wl,-rpath,$HOME/.wasmedg
 $ cd wasmprocessor
 $ go test -tags wasmedge -run '^$' -bench 'BenchmarkLogsAttributesProcessor' -benchmem -count=5 .
 $ go test -tags wasmedge -run '^$' -bench 'BenchmarkHandleVsProtoLogs' -benchmem -count=3 .   # includes the native baseline
+$ make build-wasm-guest-flavors   # TinyGo / Rust guests (requires tinygo, rust wasm32-wasip1)
+$ go test -tags wasmedge -run '^$' -bench 'BenchmarkHandleLogsGuestFlavors' -benchmem -count=3 .
 ```
