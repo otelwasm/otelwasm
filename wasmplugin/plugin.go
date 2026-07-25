@@ -6,9 +6,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
+	"strings"
 	"sync/atomic"
 
+	"github.com/otelwasm/otelwasm/wasmplugin/oci"
 	"github.com/stealthrocket/wasi-go"
 	wasigo "github.com/stealthrocket/wasi-go/imports"
 	"github.com/stealthrocket/wasi-go/imports/wasi_snapshot_preview1"
@@ -131,13 +134,7 @@ func NewWasmPlugin(ctx context.Context, cfg *Config, requiredFunctions []string)
 		return nil, err
 	}
 
-	f, err := os.Open(cfg.Path)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-
-	bytes, err := io.ReadAll(f)
+	bytes, err := readWasmModule(ctx, cfg.Path)
 	if err != nil {
 		return nil, err
 	}
@@ -212,6 +209,32 @@ func NewWasmPlugin(ctx context.Context, cfg *Config, requiredFunctions []string)
 	}
 
 	return plugin, nil
+}
+
+// readWasmModule loads the wasm module bytes from a local file path or an
+// oci:// reference (e.g. "oci://ghcr.io/otelwasm/nopprocessor:latest").
+func readWasmModule(ctx context.Context, path string) ([]byte, error) {
+	if ref, ok := strings.CutPrefix(path, "oci://"); ok {
+		return oci.Pull(ctx, ref)
+	}
+
+	u, err := url.Parse(path)
+	if err == nil && u.Scheme != "" && !isWindowsDrivePath(path) {
+		return nil, fmt.Errorf("wasm: unsupported path scheme: %s", u.Scheme)
+	}
+
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	return io.ReadAll(f)
+}
+
+// isWindowsDrivePath reports whether the path starts with a drive letter like
+// "C:\", which url.Parse would misinterpret as a URL scheme.
+func isWindowsDrivePath(path string) bool {
+	return len(path) >= 3 && path[1] == ':' && (path[2] == '\\' || path[2] == '/')
 }
 
 // prepareRuntime initializes a new WebAssembly runtime

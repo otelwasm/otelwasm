@@ -29,6 +29,7 @@ format:
 
 .PHONY: test
 test: copy-wasm-examples
+	@(cd wasmplugin; $(GOCMD) test -v -tags docker ./...)
 	@(cd wasmprocessor; $(GOCMD) test -v -tags docker ./...)
 	@(cd wasmexporter; $(GOCMD) test -v -tags docker ./...)
 	@(cd wasmreceiver; $(GOCMD) test -v -tags docker ./...)
@@ -86,6 +87,10 @@ otelwasmcol: genotelwasmcol
 .PHONY: factorybuilder
 factorybuilder:
 	$(GOCMD) build -o bin/factorybuilder ./cmd/factorybuilder
+
+.PHONY: wasmpush
+wasmpush:
+	@(cd cmd/wasmpush; $(GOCMD) build -o ../../bin/wasmpush .)
 
 .PHONY: clean
 clean:
