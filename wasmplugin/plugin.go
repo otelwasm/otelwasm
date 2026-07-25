@@ -94,6 +94,10 @@ type Stack struct {
 
 	// PluginConfigJSON is the plugin config in JSON representation passed to the guest
 	PluginConfigJSON []byte
+
+	// handles is the per-call table backing the handle-based pdata ABI.
+	// Entries are valid only for the duration of a single guest call.
+	handles []any
 }
 
 // NewWasmPlugin creates a new WasmPlugin instance

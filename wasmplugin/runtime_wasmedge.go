@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/second-state/WasmEdge-go/wasmedge"
+	"github.com/tetratelabs/wazero/api"
 )
 
 // wasmEdgeRuntime is the guestRuntime implementation backed by the WasmEdge
@@ -326,7 +327,156 @@ func (r *wasmEdgeRuntime) buildHostModule() (*wasmedge.Module, error) {
 		mod.AddFunction(hf.name, fn)
 	}
 
+	// Register the handle-based pdata ABI functions. Their implementations
+	// (handle.go) are written against the wazero host function calling
+	// convention, so they are adapted through adaptWazeroHostFn.
+	for _, hf := range []struct {
+		name    string
+		fn      func(context.Context, api.Module, []uint64)
+		params  []valKind
+		results []valKind
+	}{
+		{pdataCurrentTraces, pdataCurrentTracesFn, nil, []valKind{valI32}},
+		{pdataCommitCurrentTraces, pdataCommitCurrentTracesFn, nil, nil},
+		{pdataCurrentMetrics, pdataCurrentMetricsFn, nil, []valKind{valI32}},
+		{pdataCommitCurrentMetrics, pdataCommitCurrentMetricsFn, nil, nil},
+		{pdataCurrentLogs, pdataCurrentLogsFn, nil, []valKind{valI32}},
+		{pdataCommitCurrentLogs, pdataCommitCurrentLogsFn, nil, nil},
+		{pdataGetF64, pdataGetF64Fn, []valKind{valI32, valI32}, []valKind{valF64}},
+		{pdataSetF64, pdataSetF64Fn, []valKind{valI32, valI32, valF64}, nil},
+		{pdataGetI64, pdataGetI64Fn, []valKind{valI32, valI32}, []valKind{valI64}},
+		{pdataSetI64, pdataSetI64Fn, []valKind{valI32, valI32, valI64}, nil},
+		{pdataGetStr, pdataGetStrFn, []valKind{valI32, valI32, valI32, valI32}, []valKind{valI32}},
+		{pdataSetStr, pdataSetStrFn, []valKind{valI32, valI32, valI32, valI32}, nil},
+		{pdataGetMsg, pdataGetMsgFn, []valKind{valI32, valI32}, []valKind{valI32}},
+		{pdataSliceLen, pdataSliceLenFn, []valKind{valI32}, []valKind{valI32}},
+		{pdataSliceGet, pdataSliceGetFn, []valKind{valI32, valI32}, []valKind{valI32}},
+		{pdataMapLen, pdataMapLenFn, []valKind{valI32}, []valKind{valI32}},
+		{pdataMapGetStr, pdataMapGetStrFn, []valKind{valI32, valI32, valI32, valI32, valI32}, []valKind{valI32}},
+		{pdataMapPutStr, pdataMapPutStrFn, []valKind{valI32, valI32, valI32, valI32, valI32}, nil},
+	} {
+		ftype := wasmedge.NewFunctionType(valTypes(hf.params), valTypes(hf.results))
+		fn := wasmedge.NewFunction(ftype, r.adaptWazeroHostFn(hf.fn, hf.results), nil, 0)
+		ftype.Release()
+		if fn == nil {
+			mod.Release()
+			return nil, fmt.Errorf("failed to create host function %s", hf.name)
+		}
+		mod.AddFunction(hf.name, fn)
+	}
+
 	return mod, nil
+}
+
+// valKind identifies a wasm value type for host function signatures.
+type valKind byte
+
+const (
+	valI32 valKind = iota
+	valI64
+	valF64
+)
+
+func valTypes(kinds []valKind) []*wasmedge.ValType {
+	types := make([]*wasmedge.ValType, len(kinds))
+	for i, k := range kinds {
+		switch k {
+		case valI32:
+			types[i] = wasmedge.NewValTypeI32()
+		case valI64:
+			types[i] = wasmedge.NewValTypeI64()
+		case valF64:
+			types[i] = wasmedge.NewValTypeF64()
+		}
+	}
+	return types
+}
+
+// wazeroMemoryShim exposes a Memory as a wazero api.Memory. Only Read and
+// Write are implemented; the host functions adapted through
+// adaptWazeroHostFn use nothing else (calling any other method panics via
+// the nil embedded interface, which the adapter converts into a trap).
+type wazeroMemoryShim struct {
+	api.Memory
+	mem Memory
+}
+
+func (m wazeroMemoryShim) Read(offset, byteCount uint32) ([]byte, bool) {
+	return m.mem.Read(offset, byteCount)
+}
+
+func (m wazeroMemoryShim) Write(offset uint32, v []byte) bool {
+	return m.mem.Write(offset, v)
+}
+
+// wazeroModuleShim exposes the guest memory as a wazero api.Module. Only
+// Memory is implemented, see wazeroMemoryShim.
+type wazeroModuleShim struct {
+	api.Module
+	mem api.Memory
+}
+
+func (m wazeroModuleShim) Memory() api.Memory {
+	return m.mem
+}
+
+// adaptWazeroHostFn adapts a host function written against the wazero host
+// function calling convention (ctx + module + value stack) to the WasmEdge
+// calling convention, so that the handle-based pdata ABI implementations can
+// be shared between both runtimes without duplication.
+func (r *wasmEdgeRuntime) adaptWazeroHostFn(fn func(context.Context, api.Module, []uint64), results []valKind) wasmedgeHostFunc {
+	return func(_ interface{}, callframe *wasmedge.CallingFrame, params []interface{}) (res []interface{}, result wasmedge.Result) {
+		defer func() {
+			if recovered := recover(); recovered != nil {
+				fmt.Fprintf(os.Stderr, "wasm: host function panicked: %v\n", recovered)
+				res, result = nil, wasmedge.Result_Fail
+			}
+		}()
+
+		mem, ok := guestMemory(callframe)
+		if !ok {
+			return nil, wasmedge.Result_Fail
+		}
+
+		// Encode the parameters into a wazero-style value stack, sized to
+		// hold both parameters and results.
+		stackLen := len(params)
+		if len(results) > stackLen {
+			stackLen = len(results)
+		}
+		stack := make([]uint64, stackLen)
+		for i, p := range params {
+			switch v := p.(type) {
+			case int32:
+				stack[i] = uint64(uint32(v))
+			case int64:
+				stack[i] = uint64(v)
+			case float32:
+				stack[i] = uint64(math.Float32bits(v))
+			case float64:
+				stack[i] = math.Float64bits(v)
+			default:
+				panic(fmt.Sprintf("unsupported host function parameter type %T", p))
+			}
+		}
+
+		ctx := createContextWithStack(context.Background(), r.stack)
+		mod := wazeroModuleShim{mem: wazeroMemoryShim{mem: mem}}
+		fn(ctx, mod, stack)
+
+		res = make([]interface{}, len(results))
+		for i, k := range results {
+			switch k {
+			case valI32:
+				res[i] = int32(uint32(stack[i]))
+			case valI64:
+				res[i] = int64(stack[i])
+			case valF64:
+				res[i] = math.Float64frombits(stack[i])
+			}
+		}
+		return res, wasmedge.Result_Success
+	}
 }
 
 type wasmedgeHostFunc = func(data interface{}, callframe *wasmedge.CallingFrame, params []interface{}) ([]interface{}, wasmedge.Result)

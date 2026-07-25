@@ -179,8 +179,6 @@ func BenchmarkAttributesProcessorWasmInterpreter(b *testing.B) {
 	}
 }
 
-// NOTE: This used to crash on arm64 with wazero <= v1.9.0 (#64);
-// fixed by upgrading wazero.
 func BenchmarkAttributesProcessorWasmCompiled(b *testing.B) {
 	// Test that the processor can be created with the default config
 	factory := NewFactory()

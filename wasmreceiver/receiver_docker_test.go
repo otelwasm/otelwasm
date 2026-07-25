@@ -44,7 +44,7 @@ func TestS3Receiver(t *testing.T) {
 	}
 
 	container, err := testcontainers.Run(ctx,
-		"quay.io/minio/minio:latest",
+		"quay.io/minio/minio:RELEASE.2025-05-24T17-08-30Z",
 		testcontainers.WithExposedPorts("9000:9000/tcp", "9001:9001/tcp"),
 		testcontainers.WithEnv(map[string]string{
 			"MINIO_ROOT_USER":     "minio",

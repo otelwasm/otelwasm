@@ -4,7 +4,7 @@
 golangci_lint := github.com/golangci/golangci-lint/cmd/golangci-lint@v1.61.0
 wasibuilder   := github.com/otelwasm/wasibuilder@v0.0.6
 
-SRC_ROOT := $(git rev-parse --show-toplevel)
+SRC_ROOT := $(shell git rev-parse --show-toplevel)
 
 GOCMD?= go
 GO_BUILD_TAGS=""
@@ -117,3 +117,7 @@ otelwasmcol-wasmedge: genotelwasmcol
 .PHONY: factorybuilder
 factorybuilder:
 	$(GOCMD) build -o bin/factorybuilder ./cmd/factorybuilder
+
+.PHONY: clean
+clean:
+	@find ./cmd/otelwasmcol -type f ! -name 'Dockerfile' ! -name '.gitignore' ! -name 'builder-config.yaml' -delete

@@ -10,12 +10,11 @@ import (
 // https://github.com/kubernetes-sigs/kube-scheduler-wasm-extension
 
 // writeBytesIfUnderLimit writes bytes to memory if they fit within the limit.
-// It always returns the size of the bytes: when the size exceeds the limit,
-// nothing is written and the guest is expected to grow its buffer to the
-// returned size and call again.
+// It returns the size of the bytes regardless, so that the guest can grow its
+// buffer and retry when the value didn't fit (see guest/internal/mem.GetBytes).
 func writeBytesIfUnderLimit(memory Memory, bytes []byte, buf, bufLimit uint32) uint32 {
 	size := uint32(len(bytes))
-	if size > bufLimit {
+	if size == 0 || size > bufLimit {
 		return size
 	}
 	if !memory.Write(buf, bytes) {
