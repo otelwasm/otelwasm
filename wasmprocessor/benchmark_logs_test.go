@@ -170,11 +170,7 @@ func BenchmarkLogsAttributesProcessorWazeroInterpreter(b *testing.B) {
 		wasmplugin.RuntimeNameWazero, wasmplugin.RuntimeModeInterpreter)
 }
 
-// TODO(tsuzu): The wazero compiler backend crashes with the attributesprocessor
-// guest on arm64 (see #64 and the commented-out
-// BenchmarkAttributesProcessorWasmCompiled in benchmark_test.go).
-// Enable this once the wazero issue is resolved.
-// func BenchmarkLogsAttributesProcessorWazeroCompiled(b *testing.B) {
-// 	benchmarkWasmLogsAttributes(b, "testdata/attributesprocessor/main.wasm",
-// 		wasmplugin.RuntimeNameWazero, wasmplugin.RuntimeModeCompiled)
-// }
+func BenchmarkLogsAttributesProcessorWazeroCompiled(b *testing.B) {
+	benchmarkWasmLogsAttributes(b, "testdata/attributesprocessor/main.wasm",
+		wasmplugin.RuntimeNameWazero, wasmplugin.RuntimeModeCompiled)
+}
