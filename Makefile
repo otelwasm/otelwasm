@@ -52,12 +52,17 @@ test-wasmedge: copy-wasm-examples
 	@(cd wasmexporter; $(WASMEDGE_CGO_ENV) $(GOCMD) test -v -tags wasmedge ./...)
 	@(cd wasmreceiver; $(WASMEDGE_CGO_ENV) $(GOCMD) test -v -tags wasmedge ./...)
 
-# Precompiled AOT guest used by the WasmEdge AOT benchmark
-wasmprocessor/testdata/attributesprocessor/main-aot.wasm: wasmprocessor/testdata/attributesprocessor/main.wasm
+# Precompiled AOT guests used by the WasmEdge AOT benchmarks
+WASMEDGE_AOT_GUESTS := \
+	wasmprocessor/testdata/attributesprocessor/main-aot.wasm \
+	wasmprocessor/testdata/logs_add_attribute_handle/main-aot.wasm \
+	wasmprocessor/testdata/logs_add_attribute_proto/main-aot.wasm
+
+wasmprocessor/testdata/%/main-aot.wasm: wasmprocessor/testdata/%/main.wasm
 	$(WASMEDGE_DIR)/bin/wasmedge compile --optimize 2 $< $@
 
 .PHONY: benchmark-wasmedge
-benchmark-wasmedge: copy-wasm-examples wasmprocessor/testdata/attributesprocessor/main-aot.wasm
+benchmark-wasmedge: copy-wasm-examples $(WASMEDGE_AOT_GUESTS)
 	@(cd wasmprocessor; $(WASMEDGE_CGO_ENV) $(GOCMD) test -run='^$$' -bench=. -benchmem -tags wasmedge)
 
 define build-wasm-example
