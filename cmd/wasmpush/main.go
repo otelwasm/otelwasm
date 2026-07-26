@@ -2,7 +2,7 @@
 //
 // Usage:
 //
-//	wasmpush [-metadata metadata.json] [-format wasm|compat] main.wasm ghcr.io/otelwasm/nopprocessor:latest
+//	wasmpush [-format wasm|compat] main.wasm ghcr.io/otelwasm/nopprocessor:latest
 //
 // By default the plugin is pushed as a CNCF Wasm OCI artifact
 // (https://tag-runtime.cncf.io/wgs/wasm/deliverables/wasm-oci-artifact/).
@@ -21,13 +21,9 @@ import (
 	"github.com/otelwasm/otelwasm/wasmplugin/oci"
 )
 
-var (
-	metadataPath string
-	format       string
-)
+var format string
 
 func main() {
-	flag.StringVar(&metadataPath, "metadata", "", "path to plugin metadata JSON file (optional)")
 	flag.StringVar(&format, "format", string(oci.FormatWasm), "image format: wasm (CNCF Wasm OCI artifact) or compat (standard container image for registries without OCI artifact support)")
 	flag.Usage = func() {
 		fmt.Fprintf(flag.CommandLine.Output(), "Usage: %s [flags] <wasm-file> <reference>\n\nExample:\n  %s main.wasm ghcr.io/otelwasm/nopprocessor:latest\n\nFlags:\n", os.Args[0], os.Args[0])
@@ -52,13 +48,6 @@ func run(ctx context.Context, wasmPath, ref string) error {
 		return err
 	}
 
-	var metadata []byte
-	if metadataPath != "" {
-		if metadata, err = os.ReadFile(metadataPath); err != nil {
-			return err
-		}
-	}
-
 	repo, err := oci.NewRepository(ref)
 	if err != nil {
 		return err
@@ -68,7 +57,7 @@ func run(ctx context.Context, wasmPath, ref string) error {
 		return fmt.Errorf("reference %s has no tag", ref)
 	}
 
-	desc, err := oci.Push(ctx, repo, tag, wasm, metadata, oci.Format(format))
+	desc, err := oci.Push(ctx, repo, tag, wasm, oci.Format(format))
 	if err != nil {
 		return err
 	}
