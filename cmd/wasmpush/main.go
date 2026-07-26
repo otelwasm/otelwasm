@@ -2,7 +2,12 @@
 //
 // Usage:
 //
-//	wasmpush [-metadata metadata.json] [-format artifact|compat] main.wasm ghcr.io/otelwasm/nopprocessor:latest
+//	wasmpush [-metadata metadata.json] [-format wasm|compat] main.wasm ghcr.io/otelwasm/nopprocessor:latest
+//
+// By default the plugin is pushed as a CNCF Wasm OCI artifact
+// (https://tag-runtime.cncf.io/wgs/wasm/deliverables/wasm-oci-artifact/).
+// Pass -format compat to push a standard container image for registries
+// without OCI artifact support.
 //
 // Registry credentials are read from the local docker config (docker login).
 package main
@@ -23,7 +28,7 @@ var (
 
 func main() {
 	flag.StringVar(&metadataPath, "metadata", "", "path to plugin metadata JSON file (optional)")
-	flag.StringVar(&format, "format", string(oci.FormatArtifact), "image format: artifact (OCI artifact) or compat (standard container image for registries without OCI artifact support)")
+	flag.StringVar(&format, "format", string(oci.FormatWasm), "image format: wasm (CNCF Wasm OCI artifact) or compat (standard container image for registries without OCI artifact support)")
 	flag.Usage = func() {
 		fmt.Fprintf(flag.CommandLine.Output(), "Usage: %s [flags] <wasm-file> <reference>\n\nExample:\n  %s main.wasm ghcr.io/otelwasm/nopprocessor:latest\n\nFlags:\n", os.Args[0], os.Args[0])
 		flag.PrintDefaults()

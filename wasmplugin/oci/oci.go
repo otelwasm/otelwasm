@@ -1,15 +1,15 @@
 // Package oci implements pushing and pulling otelwasm plugin modules
-// as OCI artifacts, following the media types defined in
-// https://github.com/otelwasm/otelwasm/issues/40 (modeled after
-// https://github.com/solo-io/wasm-image-spec).
+// as OCI images.
 //
-// Two image formats are supported:
-//   - FormatArtifact: an OCI artifact with the wasm module as a raw layer.
+// Two image formats are supported for push:
+//   - FormatWasm: the CNCF Wasm OCI Artifact layout, see
+//     https://tag-runtime.cncf.io/wgs/wasm/deliverables/wasm-oci-artifact/.
 //   - FormatCompat: a standard container image whose single tar.gz layer
 //     contains plugin.wasm, for registries without OCI artifact support.
 //     See https://github.com/solo-io/wasm/blob/master/spec/spec-compat.md.
 //
-// Pull transparently handles both formats.
+// Pull transparently handles both formats, plus legacy artifacts pushed
+// with the old otelwasm media types.
 package oci
 
 import (
@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	godigest "github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/specs-go"
@@ -37,14 +38,25 @@ import (
 )
 
 const (
-	// MediaTypeMetadata is the media type of the otelwasm plugin metadata.
+	// MediaTypeWasmConfig is the config media type of the CNCF Wasm OCI
+	// Artifact layout; it identifies the artifact as Wasm.
+	MediaTypeWasmConfig = "application/vnd.wasm.config.v0+json"
+
+	// MediaTypeWasmLayer is the layer media type holding the raw wasm bytes
+	// in the CNCF Wasm OCI Artifact layout.
+	MediaTypeWasmLayer = "application/wasm"
+
+	// AnnotationMetadata is the manifest annotation storing the otelwasm
+	// plugin metadata JSON in the wasm format.
+	AnnotationMetadata = "dev.otelwasm.plugin.metadata"
+
+	// MediaTypeMetadata is the media type of the otelwasm plugin metadata
+	// in the legacy artifact format (pull only).
 	MediaTypeMetadata = "application/vnd.otelwasm.plugin.metadata.v1+json"
 
-	// MediaTypeContentLayer is the media type of the compiled plugin module data.
+	// MediaTypeContentLayer is the media type of the compiled plugin module
+	// data in the legacy artifact format (pull only).
 	MediaTypeContentLayer = "application/vnd.otelwasm.plugin.content.layer.v1+wasm"
-
-	// ArtifactType identifies otelwasm plugin artifacts in the manifest.
-	ArtifactType = "application/vnd.otelwasm.plugin.v1+json"
 
 	// compatWasmFilename is the name of the wasm module inside the tar.gz
 	// layer of a compat format image.
@@ -59,8 +71,8 @@ const (
 type Format string
 
 const (
-	// FormatArtifact stores the plugin as an OCI artifact with custom media types.
-	FormatArtifact Format = "artifact"
+	// FormatWasm stores the plugin in the CNCF Wasm OCI Artifact layout.
+	FormatWasm Format = "wasm"
 
 	// FormatCompat stores the plugin as a standard container image whose
 	// single tar.gz layer contains plugin.wasm. Use this for registries that
@@ -69,8 +81,8 @@ const (
 )
 
 // Pull fetches the wasm module stored in the OCI image referenced by ref
-// (e.g. "ghcr.io/otelwasm/nopprocessor:latest"). Both the artifact and the
-// compat format are handled.
+// (e.g. "ghcr.io/otelwasm/nopprocessor:latest"). The wasm, compat, and
+// legacy otelwasm artifact formats are all handled.
 func Pull(ctx context.Context, ref string) ([]byte, error) {
 	repo, err := NewRepository(ref)
 	if err != nil {
@@ -95,9 +107,24 @@ func PullTarget(ctx context.Context, target oras.ReadOnlyTarget, tag string) ([]
 		return nil, fmt.Errorf("oci: failed to parse manifest: %w", err)
 	}
 
+	if manifest.Config.MediaType == MediaTypeWasmConfig {
+		if len(manifest.Layers) != 1 {
+			return nil, fmt.Errorf("oci: wasm artifact must have exactly one layer, got %d", len(manifest.Layers))
+		}
+		layer := manifest.Layers[0]
+		if layer.MediaType != MediaTypeWasmLayer {
+			return nil, fmt.Errorf("oci: wasm artifact layer has unexpected media type %s (expected %s)", layer.MediaType, MediaTypeWasmLayer)
+		}
+		wasm, err := content.FetchAll(ctx, target, layer)
+		if err != nil {
+			return nil, fmt.Errorf("oci: failed to fetch wasm layer: %w", err)
+		}
+		return wasm, nil
+	}
+
 	for _, layer := range manifest.Layers {
 		switch layer.MediaType {
-		case MediaTypeContentLayer:
+		case MediaTypeWasmLayer, MediaTypeContentLayer:
 			wasm, err := content.FetchAll(ctx, target, layer)
 			if err != nil {
 				return nil, fmt.Errorf("oci: failed to fetch wasm layer: %w", err)
@@ -111,21 +138,22 @@ func PullTarget(ctx context.Context, target oras.ReadOnlyTarget, tag string) ([]
 			return extractWasmFromTar(blob)
 		}
 	}
-	return nil, fmt.Errorf("oci: no wasm layer found in manifest (expected media type %s or a compat tar.gz layer)", MediaTypeContentLayer)
+	return nil, fmt.Errorf("oci: no wasm layer found in manifest (expected media type %s, %s, or a compat tar.gz layer)", MediaTypeWasmLayer, MediaTypeContentLayer)
 }
 
 // Push packs the wasm module and metadata JSON in the given format and pushes
-// it to the target with the given tag. Empty metadata is pushed as an empty
-// JSON object. Metadata is ignored by the compat format, which has no
-// dedicated slot for it. It returns the manifest descriptor.
+// it to the target with the given tag. Non-empty metadata is stored as a
+// manifest annotation in the wasm format. Metadata is ignored by the compat
+// format, which has no dedicated slot for it. It returns the manifest
+// descriptor.
 func Push(ctx context.Context, target oras.Target, tag string, wasm, metadata []byte, format Format) (v1.Descriptor, error) {
 	store := memory.New()
 
 	var manifestDesc v1.Descriptor
 	var err error
 	switch format {
-	case FormatArtifact, "":
-		manifestDesc, err = packArtifact(ctx, store, wasm, metadata)
+	case FormatWasm, "":
+		manifestDesc, err = packWasm(ctx, store, wasm, metadata)
 	case FormatCompat:
 		manifestDesc, err = packCompat(ctx, store, wasm)
 	default:
@@ -145,30 +173,49 @@ func Push(ctx context.Context, target oras.Target, tag string, wasm, metadata []
 	return desc, nil
 }
 
-// packArtifact stores an OCI artifact manifest with the wasm module as a raw
-// layer and the metadata as the config blob.
-func packArtifact(ctx context.Context, store *memory.Store, wasm, metadata []byte) (v1.Descriptor, error) {
-	wasmDesc, err := pushBlob(ctx, store, MediaTypeContentLayer, wasm)
+// packWasm stores the wasm module in the CNCF Wasm OCI Artifact layout: a
+// single application/wasm layer with a wasm config blob. Non-empty metadata
+// is stored as a manifest annotation.
+func packWasm(ctx context.Context, store *memory.Store, wasm, metadata []byte) (v1.Descriptor, error) {
+	layerDesc, err := pushBlob(ctx, store, MediaTypeWasmLayer, wasm)
 	if err != nil {
 		return v1.Descriptor{}, fmt.Errorf("oci: failed to store wasm layer: %w", err)
 	}
 
-	if len(metadata) == 0 {
-		metadata = []byte("{}")
-	}
-	metadataDesc, err := pushBlob(ctx, store, MediaTypeMetadata, metadata)
-	if err != nil {
-		return v1.Descriptor{}, fmt.Errorf("oci: failed to store metadata: %w", err)
-	}
-
-	manifestDesc, err := oras.PackManifest(ctx, store, oras.PackManifestVersion1_1, ArtifactType, oras.PackManifestOptions{
-		ConfigDescriptor: &metadataDesc,
-		Layers:           []v1.Descriptor{wasmDesc},
+	config, err := json.Marshal(struct {
+		Created      string            `json:"created"`
+		Architecture string            `json:"architecture"`
+		OS           string            `json:"os"`
+		LayerDigests []godigest.Digest `json:"layerDigests"`
+	}{
+		Created:      time.Now().UTC().Format(time.RFC3339),
+		Architecture: "wasm",
+		OS:           "wasip1",
+		LayerDigests: []godigest.Digest{layerDesc.Digest},
 	})
 	if err != nil {
-		return v1.Descriptor{}, fmt.Errorf("oci: failed to pack manifest: %w", err)
+		return v1.Descriptor{}, fmt.Errorf("oci: failed to marshal wasm config: %w", err)
 	}
-	return manifestDesc, nil
+	configDesc, err := pushBlob(ctx, store, MediaTypeWasmConfig, config)
+	if err != nil {
+		return v1.Descriptor{}, fmt.Errorf("oci: failed to store wasm config: %w", err)
+	}
+
+	var annotations map[string]string
+	if len(metadata) > 0 {
+		annotations = map[string]string{AnnotationMetadata: string(metadata)}
+	}
+	manifest, err := json.Marshal(v1.Manifest{
+		Versioned:   specs.Versioned{SchemaVersion: 2},
+		MediaType:   v1.MediaTypeImageManifest,
+		Config:      configDesc,
+		Layers:      []v1.Descriptor{layerDesc},
+		Annotations: annotations,
+	})
+	if err != nil {
+		return v1.Descriptor{}, fmt.Errorf("oci: failed to marshal manifest: %w", err)
+	}
+	return pushBlob(ctx, store, v1.MediaTypeImageManifest, manifest)
 }
 
 // packCompat stores a docker-compatible image manifest whose single tar.gz
